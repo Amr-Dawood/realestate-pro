@@ -1,0 +1,12 @@
+{
+  "name": "realestate-pro",
+  "version": "1.0.0",
+  "description": "Real Estate Property Comparison & PDF Generator",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "npm install --prefix server && npm install --prefix client && npm run build --prefix client",
+    "start": "node server/server.js"
+  }
+}

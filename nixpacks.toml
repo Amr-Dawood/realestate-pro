@@ -1,0 +1,15 @@
+[phases.install]
+cmds = [
+  "npm install --prefix server",
+  "npm install --prefix client"
+]
+
+[phases.build]
+cmds = [
+  "(cd server && npx prisma generate)",
+  "(cd server && npx prisma db push)",
+  "npm run build --prefix client"
+]
+
+[start]
+cmd = "node server/server.js"

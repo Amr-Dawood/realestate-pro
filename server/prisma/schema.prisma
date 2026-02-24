@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Developer {
+  id          Int        @id @default(autoincrement())
+  name        String
+  description String?
+  logo        String?
+  website     String?
+  phone       String?
+  email       String?
+  address     String?
+  compounds   Compound[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Compound {
+  id              Int       @id @default(autoincrement())
+  name            String
+  location        String
+  city            String?
+  type            String    // residential, commercial, mixed
+  status          String?   // under_construction, ready, launching
+  deliveryDate    String?
+  description     String?
+  amenities       String?   // JSON array
+  minPrice        Float?
+  maxPrice        Float?
+  totalUnits      Int?
+  availableUnits  Int?
+  developer       Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+  developerId     Int
+  units           Unit[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Unit {
+  id            Int      @id @default(autoincrement())
+  name          String?
+  type          String   // apartment, villa, duplex, penthouse, townhouse, studio
+  bedrooms      Int
+  bathrooms     Int
+  area          Float    // sqm
+  price         Float
+  pricePerSqm   Float?
+  floor         Int?
+  view          String?  // garden, pool, street, sea, city
+  finishingType String   // core_shell, semi_finished, fully_finished
+  available     Boolean  @default(true)
+  paymentPlan   String?  // JSON object
+  features      String?  // JSON array
+  compound      Compound @relation(fields: [compoundId], references: [id], onDelete: Cascade)
+  compoundId    Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model CustomerRequirement {
+  id                 Int      @id @default(autoincrement())
+  customerName       String
+  email              String?
+  phone              String?
+  minBedrooms        Int?
+  maxBedrooms        Int?
+  minBathrooms       Int?
+  maxBathrooms       Int?
+  minArea            Float?
+  maxArea            Float?
+  minBudget          Float?
+  maxBudget          Float?
+  preferredLocations String?  // JSON array
+  preferredTypes     String?  // JSON array (apartment, villa, etc)
+  preferredViews     String?  // JSON array
+  finishingType      String?  // preferred finishing
+  notes              String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model ComparisonReport {
+  id                    Int      @id @default(autoincrement())
+  customerRequirementId Int
+  matchedUnits          String   // JSON array of unit IDs with scores
+  generatedAt           DateTime @default(now())
+  pdfPath               String?
+}

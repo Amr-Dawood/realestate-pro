@@ -9,6 +9,11 @@ import { generateComparisonPDF } from './services/pdfGenerator.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const IS_PROD = process.env.NODE_ENV === 'production';
 
+// Ensure DATABASE_URL is set — Railway sets it via env vars; local dev falls back to server/ directory
+if (!process.env.DATABASE_URL) {
+    process.env.DATABASE_URL = `file:${path.join(__dirname, 'prisma/dev.db')}`;
+}
+
 const app = express();
 const prisma = new PrismaClient();
 
@@ -339,9 +344,12 @@ app.post('/api/compare', async (req, res) => {
         // Save requirements if customer name provided
         let savedRequirement = null;
         if (requirements.customerName) {
-            savedRequirement = await prisma.customerRequirement.create({
-                data: requirements
-            });
+            const dbData = { ...requirements };
+            // Stringify array fields before saving (Prisma schema stores them as JSON strings)
+            if (Array.isArray(dbData.preferredLocations)) dbData.preferredLocations = JSON.stringify(dbData.preferredLocations);
+            if (Array.isArray(dbData.preferredTypes))    dbData.preferredTypes    = JSON.stringify(dbData.preferredTypes);
+            if (Array.isArray(dbData.preferredViews))    dbData.preferredViews    = JSON.stringify(dbData.preferredViews);
+            savedRequirement = await prisma.customerRequirement.create({ data: dbData });
         }
 
         res.json({

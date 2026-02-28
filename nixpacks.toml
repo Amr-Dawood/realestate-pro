@@ -1,7 +1,7 @@
 [phases.install]
 cmds = [
   "npm install --prefix server",
-  "env -u NODE_ENV npm install --prefix client"
+  "npm install --prefix client"
 ]
 
 [phases.build]

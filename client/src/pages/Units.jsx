@@ -205,21 +205,6 @@ export default function Units() {
         return <span className={`badge ${badge.class}`}>{badge.text}</span>;
     };
 
-    const getTypeBadge = (type) => {
-        const types = { studio: '🏨 Studio', apartment: '🏠 Apartment', duplex: '🏡 Duplex', penthouse: '🌆 Penthouse', townhouse: '🏘️ Townhouse', villa: '🏰 Villa' };
-        return types[type] || type;
-    };
-
-    const getFinishingBadge = (finishing) => {
-        const badges = {
-            core_shell: { class: 'badge-danger', text: 'Core & Shell' },
-            semi_finished: { class: 'badge-warning', text: 'Semi-Finished' },
-            fully_finished: { class: 'badge-accent', text: 'Fully Finished' }
-        };
-        const badge = badges[finishing] || badges.semi_finished;
-        return <span className={`badge ${badge.class}`}>{badge.text}</span>;
-    };
-
     const f = (key, value) => setFormData(prev => ({ ...prev, [key]: value }));
 
     if (loading) {

@@ -35,6 +35,8 @@ model Compound {
   maxPrice        Float?
   totalUnits      Int?
   availableUnits  Int?
+  masterPlan      String?  // master plan description or URL
+  community       String?  // community features/description
   developer       Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
   developerId     Int
   units           Unit[]
@@ -43,24 +45,36 @@ model Compound {
 }
 
 model Unit {
-  id            Int      @id @default(autoincrement())
-  name          String?
-  type          String   // apartment, villa, duplex, penthouse, townhouse, studio
-  bedrooms      Int
-  bathrooms     Int
-  area          Float    // sqm
-  price         Float
-  pricePerSqm   Float?
-  floor         Int?
-  view          String?  // garden, pool, street, sea, city
-  finishingType String   // core_shell, semi_finished, fully_finished
-  available     Boolean  @default(true)
-  paymentPlan   String?  // JSON object
-  features      String?  // JSON array
-  compound      Compound @relation(fields: [compoundId], references: [id], onDelete: Cascade)
-  compoundId    Int
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                Int      @id @default(autoincrement())
+  name              String?
+  type              String   // apartment, villa, duplex, penthouse, townhouse, studio
+  bedrooms          Int
+  bathrooms         Int
+  area              Float    // sqm
+  price             Float
+  pricePerSqm       Float?
+  floor             Int?
+  view              String?  // garden, pool, street, sea, city
+  finishingType     String   // core_shell, semi_finished, fully_finished
+  finishingSpecs    String?  // detailed finishing specifications
+  available         Boolean  @default(true)
+  paymentPlan       String?  // JSON object
+  features          String?  // JSON array
+  // Market & Investment fields
+  resaleMarket      String?  // resale market description/status
+  priceIncreaseRate Float?   // expected annual price increase %
+  rateViaMarket     Float?   // price per sqm from market comparison
+  appreciationRate  Float?   // property appreciation rate %
+  rentYield         Float?   // annual rental yield %
+  valueForMoney     Float?   // value-for-money score 1-10
+  locationUnit      String?  // specific unit location within compound
+  footprint         String?  // unit footprint/layout description
+  constructionUpdate String? // latest construction status update
+  floorPlanImage    String?  // path/URL to 2D floor plan image
+  compound          Compound @relation(fields: [compoundId], references: [id], onDelete: Cascade)
+  compoundId        Int
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 model CustomerRequirement {

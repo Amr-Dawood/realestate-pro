@@ -29,5 +29,6 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Prisma
-server/prisma/migrations/
+# Uploads (user-uploaded files, not tracked)
+server/uploads/*
+!server/uploads/.gitkeep

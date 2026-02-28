@@ -1,8 +1,10 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { PrismaClient } from '@prisma/client';
+import multer from 'multer';
 import { compareUnits, generateComparisonSummary } from './services/comparisonEngine.js';
 import { generateComparisonPDF } from './services/pdfGenerator.js';
 
@@ -14,6 +16,27 @@ if (!process.env.DATABASE_URL) {
     process.env.DATABASE_URL = `file:${path.join(__dirname, 'prisma/dev.db')}`;
 }
 
+// Ensure uploads directory exists
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+// Multer storage config
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, uploadsDir),
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname);
+        cb(null, `unit-${req.params.id}-floor-plan-${Date.now()}${ext}`);
+    }
+});
+const upload = multer({
+    storage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype.startsWith('image/')) cb(null, true);
+        else cb(new Error('Only image files are allowed'));
+    }
+});
+
 const app = express();
 const prisma = new PrismaClient();
 
@@ -22,6 +45,9 @@ app.use(cors({
     exposedHeaders: ['Content-Disposition', 'Content-Length']
 }));
 app.use(express.json());
+
+// Serve uploaded floor plan images
+app.use('/uploads', express.static(uploadsDir));
 
 // ============================================
 // DEVELOPER ENDPOINTS
@@ -285,6 +311,42 @@ app.delete('/api/units/:id', async (req, res) => {
             where: { id: parseInt(req.params.id) }
         });
         res.status(204).send();
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Upload floor plan image for a unit
+app.post('/api/units/:id/floor-plan', upload.single('floorPlan'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: 'No image file provided' });
+
+        const imageUrl = `/uploads/${req.file.filename}`;
+        const unit = await prisma.unit.update({
+            where: { id: parseInt(req.params.id) },
+            data: { floorPlanImage: imageUrl },
+            include: { compound: { include: { developer: true } } }
+        });
+        res.json({ url: imageUrl, unit });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Delete floor plan image for a unit
+app.delete('/api/units/:id/floor-plan', async (req, res) => {
+    try {
+        const unit = await prisma.unit.findUnique({ where: { id: parseInt(req.params.id) } });
+        if (unit?.floorPlanImage) {
+            const filePath = path.join(__dirname, unit.floorPlanImage);
+            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        }
+        const updated = await prisma.unit.update({
+            where: { id: parseInt(req.params.id) },
+            data: { floorPlanImage: null },
+            include: { compound: { include: { developer: true } } }
+        });
+        res.json(updated);
     } catch (error) {
         res.status(400).json({ error: error.message });
     }

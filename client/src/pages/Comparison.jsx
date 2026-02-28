@@ -172,6 +172,10 @@ export default function Comparison() {
         return 'poor';
     };
 
+    const infoBox = { background: 'var(--nawy-bg, #f8fafc)', borderRadius: 6, padding: '6px 10px', border: '1px solid var(--nawy-border, #e2e8f0)' };
+    const infoLabel = { display: 'block', fontSize: '0.68rem', color: 'var(--nawy-text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 2 };
+    const infoValue = { display: 'block', fontSize: '0.82rem', color: 'var(--nawy-text-primary)', fontWeight: 500 };
+
     const formatPricePerSqm = (result) => {
         const ppsqm = result.unit.pricePerSqm || (result.unit.price && result.unit.area ? result.unit.price / result.unit.area : null);
         if (!ppsqm) return null;
@@ -544,7 +548,116 @@ export default function Comparison() {
                                                 {result.unit.finishingType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                                             </span>
                                         </div>
+                                        {result.unit.appreciationRate != null && (
+                                            <div className="spec-box">
+                                                <span className="spec-box-label">Appreciation</span>
+                                                <span className="spec-box-value" style={{ color: '#10b981' }}>{result.unit.appreciationRate}%</span>
+                                            </div>
+                                        )}
+                                        {result.unit.rentYield != null && (
+                                            <div className="spec-box">
+                                                <span className="spec-box-label">Rent Yield</span>
+                                                <span className="spec-box-value" style={{ color: '#3b82f6' }}>{result.unit.rentYield}%</span>
+                                            </div>
+                                        )}
+                                        {result.unit.valueForMoney != null && (
+                                            <div className="spec-box">
+                                                <span className="spec-box-label">Value/Money</span>
+                                                <span className="spec-box-value">{result.unit.valueForMoney}/10</span>
+                                            </div>
+                                        )}
                                     </div>
+
+                                    {/* Extended Info Grid */}
+                                    {(result.unit.resaleMarket || result.unit.priceIncreaseRate != null || result.unit.rateViaMarket != null ||
+                                      result.unit.locationUnit || result.unit.footprint || result.unit.constructionUpdate ||
+                                      result.unit.finishingSpecs || result.unit.paymentPlan ||
+                                      result.unit.compound?.community || result.unit.compound?.masterPlan ||
+                                      result.unit.compound?.developer?.description) && (
+                                        <div style={{ marginTop: 'var(--space-md)', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 'var(--space-sm)' }}>
+                                            {result.unit.resaleMarket && (
+                                                <div style={infoBox}>
+                                                    <span style={infoLabel}>🏷️ Resale Market</span>
+                                                    <span style={infoValue}>{result.unit.resaleMarket}</span>
+                                                </div>
+                                            )}
+                                            {result.unit.priceIncreaseRate != null && (
+                                                <div style={infoBox}>
+                                                    <span style={infoLabel}>📈 Price Increase</span>
+                                                    <span style={infoValue}>{result.unit.priceIncreaseRate}% / yr</span>
+                                                </div>
+                                            )}
+                                            {result.unit.rateViaMarket != null && (
+                                                <div style={infoBox}>
+                                                    <span style={infoLabel}>📊 Market Rate</span>
+                                                    <span style={infoValue}>{new Intl.NumberFormat('en-EG', { style: 'currency', currency: 'EGP', maximumFractionDigits: 0 }).format(result.unit.rateViaMarket)} /sqm</span>
+                                                </div>
+                                            )}
+                                            {result.unit.locationUnit && (
+                                                <div style={infoBox}>
+                                                    <span style={infoLabel}>📍 Location Unit</span>
+                                                    <span style={infoValue}>{result.unit.locationUnit}</span>
+                                                </div>
+                                            )}
+                                            {result.unit.footprint && (
+                                                <div style={infoBox}>
+                                                    <span style={infoLabel}>🔲 Foot Print</span>
+                                                    <span style={infoValue}>{result.unit.footprint}</span>
+                                                </div>
+                                            )}
+                                            {result.unit.constructionUpdate && (
+                                                <div style={infoBox}>
+                                                    <span style={infoLabel}>🏗️ Construction</span>
+                                                    <span style={infoValue}>{result.unit.constructionUpdate}</span>
+                                                </div>
+                                            )}
+                                            {result.unit.finishingSpecs && (
+                                                <div style={infoBox}>
+                                                    <span style={infoLabel}>✨ Finishing Specs</span>
+                                                    <span style={infoValue}>{result.unit.finishingSpecs}</span>
+                                                </div>
+                                            )}
+                                            {result.unit.paymentPlan && (
+                                                <div style={infoBox}>
+                                                    <span style={infoLabel}>💳 Payment Plan</span>
+                                                    <span style={infoValue}>{result.unit.paymentPlan}</span>
+                                                </div>
+                                            )}
+                                            {result.unit.compound?.community && (
+                                                <div style={infoBox}>
+                                                    <span style={infoLabel}>🏘️ Community</span>
+                                                    <span style={infoValue}>{result.unit.compound.community}</span>
+                                                </div>
+                                            )}
+                                            {result.unit.compound?.masterPlan && (
+                                                <div style={infoBox}>
+                                                    <span style={infoLabel}>🗺️ Master Plan</span>
+                                                    <span style={infoValue}>{result.unit.compound.masterPlan}</span>
+                                                </div>
+                                            )}
+                                            {result.unit.compound?.developer?.description && (
+                                                <div style={{ ...infoBox, gridColumn: '1 / -1' }}>
+                                                    <span style={infoLabel}>🏢 Developer History</span>
+                                                    <span style={infoValue}>{result.unit.compound.developer.description}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Floor Plan Image */}
+                                    {result.unit.floorPlanImage && (
+                                        <div style={{ marginTop: 'var(--space-md)', paddingTop: 'var(--space-md)', borderTop: '1px solid var(--nawy-border)' }}>
+                                            <div style={{ fontSize: '0.72rem', color: 'var(--nawy-text-secondary)', marginBottom: 'var(--space-sm)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                🗺️ Unit 2D Floor Plan
+                                            </div>
+                                            <img
+                                                src={result.unit.floorPlanImage}
+                                                alt="Floor Plan"
+                                                style={{ maxWidth: '100%', maxHeight: 300, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--nawy-border)', cursor: 'pointer' }}
+                                                onClick={() => window.open(result.unit.floorPlanImage, '_blank')}
+                                            />
+                                        </div>
+                                    )}
 
                                     {/* Highlights & Concerns */}
                                     {(result.highlights?.highlights?.length > 0 || result.highlights?.concerns?.length > 0) && (

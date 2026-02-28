@@ -6,9 +6,8 @@ cmds = [
 
 [phases.build]
 cmds = [
-  "(cd server && npx prisma generate)",
   "npm run build --prefix client"
 ]
 
 [start]
-cmd = "cd server && npx prisma db push && node server.js"
+cmd = "cd server && npx prisma generate && npx prisma db push && node server.js"

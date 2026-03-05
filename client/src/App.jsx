@@ -5,6 +5,7 @@ import Developers from './pages/Developers';
 import Compounds from './pages/Compounds';
 import Units from './pages/Units';
 import Comparison from './pages/Comparison';
+import UnitComparison from './pages/UnitComparison';
 
 function App() {
     return (
@@ -18,6 +19,7 @@ function App() {
                         <Route path="/compounds" element={<Compounds />} />
                         <Route path="/units" element={<Units />} />
                         <Route path="/comparison" element={<Comparison />} />
+                        <Route path="/unit-comparison" element={<UnitComparison />} />
                     </Routes>
                 </main>
             </div>
@@ -60,7 +62,11 @@ function Sidebar() {
                     <div className="nav-section-title">Analysis</div>
                     <NavLink to="/comparison" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                         <span className="nav-icon">📋</span>
-                        Comparison
+                        Requirements Match
+                    </NavLink>
+                    <NavLink to="/unit-comparison" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                        <span className="nav-icon">⚖️</span>
+                        Unit Comparison
                     </NavLink>
                 </div>
             </nav>

@@ -1,7 +1,8 @@
 import PDFDocument from 'pdfkit';
 
 /**
- * Real Estate Comparison PDF — Black & Gold Elegant Edition
+ * Real Estate Comparison PDF — Black & Gold Elegant Edition v2
+ * Enhanced: diagonal cover accent · investment chips · ROI Analysis page · investment highlights
  */
 
 const C = {
@@ -12,20 +13,22 @@ const C = {
     black4:   '#282828',
 
     // ── Golds ──
-    gold:     '#C9A84C',   // Primary gold
-    goldDk:   '#A07830',   // Dark gold
-    goldLt:   '#E8CC7A',   // Light gold
-    goldPale: '#F9F3DC',   // Pale gold (highlights on light bg)
-    goldRule: '#3A2E10',   // Very dark gold for subtle decorative elements
+    gold:     '#C9A84C',
+    goldDk:   '#A07830',
+    goldLt:   '#E8CC7A',
+    goldPale: '#F9F3DC',
+    goldRule: '#3A2E10',
 
     // ── Light backgrounds ──
     white:    '#FFFFFF',
-    cream:    '#FAF8F2',   // Warm page background
-    offWhite: '#F2EDE0',   // Slightly darker cream for alternating rows
+    cream:    '#FAF8F2',
+    offWhite: '#F2EDE0',
 
     // ── Status ──
     green:    '#2D7D46',
     greenLt:  '#E8F5EC',
+    teal:     '#0D7377',
+    tealLt:   '#E0F4F4',
     amber:    '#B87010',
     amberLt:  '#FEF3E2',
     red:      '#B83232',
@@ -38,9 +41,44 @@ const C = {
     txtMute:  '#8A8A8A',
 
     // ── Borders ──
-    border:   '#E0D8C4',   // Warm light border
-    borderDk: '#252525',   // Dark border
+    border:   '#E0D8C4',
+    borderDk: '#252525',
 };
+
+// ─────────────────────────────────────────────
+// ROI helper (mirrors frontend calcROI)
+// ─────────────────────────────────────────────
+function calcUnitROI(unit) {
+    if (!unit?.price) return null;
+    const price = unit.price;
+    const ry = unit.rentYield;
+    const ar = unit.appreciationRate;
+
+    const annualRent    = ry != null ? price * ry / 100 : null;
+    const annualCapGain = ar != null ? price * ar / 100 : null;
+    const combinedROI   = ry != null && ar != null ? ry + ar
+                        : ry != null ? ry : ar != null ? ar : null;
+    const totalAnnualReturn = annualRent != null && annualCapGain != null
+                            ? annualRent + annualCapGain
+                            : annualRent ?? annualCapGain ?? null;
+
+    const val1yr = ar != null ? price * Math.pow(1 + ar / 100, 1) : null;
+    const val3yr = ar != null ? price * Math.pow(1 + ar / 100, 3) : null;
+    const val5yr = ar != null ? price * Math.pow(1 + ar / 100, 5) : null;
+
+    const rent3yr = annualRent != null ? annualRent * 3 : null;
+    const rent5yr = annualRent != null ? annualRent * 5 : null;
+
+    const total3yr = val3yr != null && rent3yr != null ? (val3yr - price) + rent3yr
+                   : val3yr != null ? val3yr - price : rent3yr ?? null;
+    const total5yr = val5yr != null && rent5yr != null ? (val5yr - price) + rent5yr
+                   : val5yr != null ? val5yr - price : rent5yr ?? null;
+
+    const roi3yr = total3yr != null ? (total3yr / price) * 100 : null;
+    const roi5yr = total5yr != null ? (total5yr / price) * 100 : null;
+
+    return { annualRent, annualCapGain, combinedROI, totalAnnualReturn, val1yr, val3yr, val5yr, rent3yr, rent5yr, total3yr, total5yr, roi3yr, roi5yr };
+}
 
 // ─────────────────────────────────────────────
 export async function generateComparisonPDF(requirements, results, summary) {
@@ -68,6 +106,11 @@ export async function generateComparisonPDF(requirements, results, summary) {
             pageScorecard(doc, results);
             pageBento(doc, results.slice(0, 5));
             if (results.length >= 2) pageSideBySide(doc, results.slice(0, 3));
+
+            // ROI Analysis page (only if investment data available)
+            const hasROI = results.some(r => r.unit?.appreciationRate != null || r.unit?.rentYield != null);
+            if (results.length >= 1 && hasROI) pageROI(doc, results.slice(0, 3));
+
             pageRecommendation(doc, results[0], requirements);
 
             addFooters(doc);
@@ -80,7 +123,7 @@ export async function generateComparisonPDF(requirements, results, summary) {
 }
 
 // ═══════════════════════════════════════════════════════
-// PAGE 1 — COVER  (full black · gold accents)
+// PAGE 1 — COVER
 // ═══════════════════════════════════════════════════════
 function pageCover(doc, requirements, summary) {
     const W = doc.page.width, H = doc.page.height;
@@ -97,6 +140,12 @@ function pageCover(doc, requirements, summary) {
     // Decorative: hollow arc — bottom left
     doc.save();
     doc.circle(-50, H + 40, 250).lineWidth(0.5).strokeColor(C.goldRule).stroke();
+    doc.restore();
+
+    // ── Diagonal corner accent (top-right) ──
+    doc.save();
+    doc.moveTo(W - 130, 0).lineTo(W, 0).lineTo(W, 130).closePath().fill(C.goldDk);
+    doc.moveTo(W - 78, 0).lineTo(W, 0).lineTo(W, 78).closePath().fill(C.gold);
     doc.restore();
 
     // Gold dot + brand label
@@ -151,7 +200,6 @@ function pageCover(doc, requirements, summary) {
     const statsY = H - 120;
     const statBoxW = (W - 104) / 3;
 
-    // Thin gold rule above stats
     doc.rect(52, statsY - 12, W - 104, 0.5).fill(C.goldRule);
 
     const statsData = [
@@ -179,10 +227,7 @@ function pageRequirements(doc, requirements, summary) {
     doc.addPage({ margins: { top: 0, bottom: 0, left: 0, right: 0 } });
     const W = doc.page.width;
 
-    // Cream body background
     doc.rect(0, 0, W, doc.page.height).fill(C.cream);
-
-    // Black header + gold underline
     doc.rect(0, 0, W, 68).fill(C.black);
     doc.rect(0, 68, W, 2).fill(C.gold);
     doc.fontSize(8).fillColor(C.gold).font('Helvetica-Bold')
@@ -319,19 +364,16 @@ function pageScorecard(doc, results) {
         const mc = matchCol(result.matchPercentage);
         const isTop = idx === 0;
 
-        // Card
         doc.roundedRect(mx, y, cw, cardH, 5).fill(isTop ? C.black2 : C.white);
         doc.roundedRect(mx, y, cw, cardH, 5)
             .lineWidth(isTop ? 1 : 0.5)
             .strokeColor(isTop ? C.gold : C.border).stroke();
 
-        // Left color strip
         doc.save();
         doc.rect(mx, y, 4, cardH).clip();
         doc.roundedRect(mx, y, 4, cardH, 2).fill(mc);
         doc.restore();
 
-        // Rank
         const rankX = mx + 16;
         if (isTop) {
             doc.roundedRect(rankX, y + (cardH - 22) / 2, 34, 22, 4).fill(C.gold);
@@ -342,7 +384,6 @@ function pageScorecard(doc, results) {
                 .text(String(idx + 1).padStart(2, '0'), rankX, y + 20, { width: 34, align: 'center' });
         }
 
-        // Property info
         const infoX = mx + 62;
         const nameCol = isTop ? C.white : C.txt;
         const subCol  = isTop ? C.txtMute : C.txtSub;
@@ -351,14 +392,12 @@ function pageScorecard(doc, results) {
         doc.fontSize(8.5).fillColor(subCol).font('Helvetica')
             .text(`${dev.name || '—'}  ·  ${compound.location || '—'}`, infoX, y + 26, { width: 170 });
 
-        // Type badge
         const typeW = doc.fontSize(7.5).widthOfString(cap(unit.type || '—')) + 12;
         doc.roundedRect(infoX, y + 44, typeW, 13, 3)
             .fill(isTop ? C.black4 : C.offWhite);
         doc.fontSize(7.5).fillColor(isTop ? C.gold : C.txtSub).font('Helvetica')
             .text(cap(unit.type || '—'), infoX, y + 47, { width: typeW, align: 'center' });
 
-        // Specs inline
         const specsX = mx + 246;
         const specs = [
             `${unit.bedrooms || '—'} Bed`,
@@ -370,13 +409,23 @@ function pageScorecard(doc, results) {
         specs.forEach((sp, si) => {
             const spX = specsX + si * 54;
             if (spX + 48 > mx + cw - 100) return;
-            doc.fontSize(8).fillColor(isTop ? C.txtSub : C.txtSub).font('Helvetica')
+            doc.fontSize(8).fillColor(C.txtSub).font('Helvetica')
                 .text(sp, spX, y + 14, { lineBreak: false });
         });
-        doc.fontSize(7.5).fillColor(isTop ? C.txtMute : C.txtMute).font('Helvetica')
+        doc.fontSize(7.5).fillColor(C.txtMute).font('Helvetica')
             .text(fmtFin(unit.finishingType), specsX, y + 30, { lineBreak: false });
 
-        // Price
+        // Investment mini indicators
+        const investX = specsX;
+        const investChips = [
+            unit.appreciationRate != null ? `↑${unit.appreciationRate}%` : null,
+            unit.rentYield != null        ? `${unit.rentYield}% yld` : null,
+        ].filter(Boolean);
+        if (investChips.length) {
+            doc.fontSize(7).fillColor(C.green).font('Helvetica-Bold')
+                .text(investChips.join('  ·  '), investX, y + 44, { lineBreak: false });
+        }
+
         const priceX = W - mx - 140;
         doc.fontSize(12).fillColor(isTop ? C.gold : C.goldDk).font('Helvetica-Bold')
             .text(shortCur(unit.price), priceX, y + 10, { width: 80, align: 'right', lineBreak: false });
@@ -384,7 +433,6 @@ function pageScorecard(doc, results) {
         doc.fontSize(8).fillColor(C.txtMute).font('Helvetica')
             .text(`${shortCur(ppsqm)}/sqm`, priceX, y + 28, { width: 80, align: 'right' });
 
-        // Score pill
         const pillX = W - mx - 52;
         doc.roundedRect(pillX, y + 10, 48, 44, 6).fill(mc);
         doc.fontSize(17).fillColor(C.black).font('Helvetica-Bold')
@@ -419,7 +467,16 @@ function pageBento(doc, topResults) {
     const mx = 52, cw = W - mx * 2;
 
     topResults.forEach((result, idx) => {
-        const bannerH = 54, bodyH = 106, cardH = bannerH + bodyH;
+        // Move unit extraction before cardH so hasInvestment can drive bodyH
+        const unit = result.unit, compound = unit?.compound || {}, dev = compound?.developer || {};
+        const mc = matchCol(result.matchPercentage);
+        const isTop = idx === 0;
+
+        const hasInvestment = unit.appreciationRate != null || unit.rentYield != null || unit.valueForMoney != null;
+        const bannerH = 54;
+        const bodyH = hasInvestment ? 130 : 112;
+        const cardH = bannerH + bodyH;
+
         if (y + cardH > 762) {
             doc.addPage({ margins: { top: 0, bottom: 0, left: 0, right: 0 } });
             doc.rect(0, 0, W, doc.page.height).fill(C.cream);
@@ -430,37 +487,29 @@ function pageBento(doc, topResults) {
             y = 82;
         }
 
-        const unit = result.unit, compound = unit?.compound || {}, dev = compound?.developer || {};
-        const mc = matchCol(result.matchPercentage);
-        const isTop = idx === 0;
-
         // Card shell
         doc.roundedRect(mx, y, cw, cardH, 7).fill(C.white);
         doc.roundedRect(mx, y, cw, cardH, 7)
             .lineWidth(isTop ? 1.5 : 0.5).strokeColor(isTop ? C.gold : C.border).stroke();
 
-        // Banner (black)
+        // Banner
         doc.save();
         doc.rect(mx, y, cw, bannerH).clip();
         doc.roundedRect(mx, y, cw, bannerH, 7).fill(C.black);
         doc.restore();
 
-        // Thin gold rule below banner
         doc.rect(mx, y + bannerH - 1, cw, 1).fill(C.gold);
 
-        // Rank chip
         const rankChipW = isTop ? 74 : 30;
         doc.roundedRect(mx + 14, y + 15, rankChipW, 22, 4).fill(C.gold);
         doc.fontSize(isTop ? 8 : 11).fillColor(C.black).font('Helvetica-Bold')
             .text(isTop ? 'TOP PICK' : `#${idx + 1}`, mx + 14, y + 21, { width: rankChipW, align: 'center' });
 
-        // Score on right of banner
         doc.fontSize(26).fillColor(C.gold).font('Helvetica-Bold')
             .text(`${result.matchPercentage}%`, mx + cw - 92, y + 8, { width: 78, align: 'right' });
         doc.fontSize(7.5).fillColor(C.txtMute).font('Helvetica')
             .text('MATCH', mx + cw - 92, y + 38, { width: 78, align: 'right' });
 
-        // Property name + developer in banner
         const nameX = mx + 14 + rankChipW + 12;
         doc.fontSize(13).fillColor(C.white).font('Helvetica-Bold')
             .text(compound.name || '—', nameX, y + 10, { width: cw - rankChipW - 122, lineBreak: false });
@@ -502,8 +551,27 @@ function pageBento(doc, topResults) {
         doc.fontSize(8.5).fillColor(C.txtMute).font('Helvetica')
             .text(`${shortCur(ppsqm)}/sqm`, mx + 180, priceY + 2, { lineBreak: false });
 
-        // Mini score bars
-        const barsY = priceY + 20;
+        // ── Investment metrics row (NEW) ──
+        if (hasInvestment) {
+            const investY = priceY + 20;
+            let chipX = mx + 4;
+            const chips = [
+                unit.appreciationRate != null ? { t: `↑ ${unit.appreciationRate}% Apprec.`, c: C.green,   bg: C.greenLt  } : null,
+                unit.rentYield        != null ? { t: `${unit.rentYield}% Yield`,             c: C.teal,    bg: C.tealLt   } : null,
+                unit.valueForMoney    != null ? { t: `★ ${unit.valueForMoney}/10 Value`,     c: C.goldDk,  bg: C.goldPale } : null,
+            ].filter(Boolean);
+            chips.forEach(chip => {
+                const chipW = doc.fontSize(7.5).widthOfString(chip.t) + 12;
+                if (chipX + chipW > mx + cw - 4) return;
+                doc.roundedRect(chipX, investY, chipW, 14, 3).fill(chip.bg);
+                doc.fontSize(7.5).fillColor(chip.c).font('Helvetica-Bold')
+                    .text(chip.t, chipX + 4, investY + 3, { lineBreak: false });
+                chipX += chipW + 5;
+            });
+        }
+
+        // Mini score bars (shifted down when investment row present)
+        const barsY = priceY + (hasInvestment ? 40 : 20);
         const scoreEntries = Object.entries(result.scores || {});
         const bw = Math.floor((cw - (scoreEntries.length - 1) * 6) / scoreEntries.length);
         scoreEntries.forEach(([key, val], bi) => {
@@ -577,24 +645,29 @@ function pageSideBySide(doc, results) {
     });
     y += 76;
 
-    // Attribute rows
     const attrs = [
-        { label: 'Location',   get: r => r.unit?.compound?.location || '—' },
-        { label: 'Type',       get: r => cap(r.unit?.type || '—') },
-        { label: 'Bedrooms',   get: r => String(r.unit?.bedrooms || '—'), num: r => r.unit?.bedrooms || 0,  best: 'high' },
-        { label: 'Bathrooms',  get: r => String(r.unit?.bathrooms || '—'), num: r => r.unit?.bathrooms || 0, best: 'high' },
-        { label: 'Area (sqm)', get: r => `${r.unit?.area || '—'}`,         num: r => r.unit?.area || 0,      best: 'high' },
-        { label: 'Price',      get: r => shortCur(r.unit?.price),           num: r => r.unit?.price || 0,    best: 'low' },
-        { label: '/sqm',       get: r => shortCur(r.unit?.pricePerSqm || (r.unit?.price && r.unit?.area ? r.unit.price / r.unit.area : 0)),
-                               num: r => r.unit?.pricePerSqm || (r.unit?.price && r.unit?.area ? r.unit.price / r.unit.area : 0), best: 'low' },
-        { label: 'Finishing',  get: r => fmtFin(r.unit?.finishingType) },
-        { label: 'Floor',      get: r => r.unit?.floor ? `Floor ${r.unit.floor}` : '—' },
-        { label: 'View',       get: r => cap(r.unit?.view || '—') },
-        { label: 'Match',      get: r => `${r.matchPercentage}%`,           num: r => r.matchPercentage,      best: 'high' },
+        { label: 'Location',    get: r => r.unit?.compound?.location || '—' },
+        { label: 'Type',        get: r => cap(r.unit?.type || '—') },
+        { label: 'Bedrooms',    get: r => String(r.unit?.bedrooms || '—'), num: r => r.unit?.bedrooms || 0,  best: 'high' },
+        { label: 'Bathrooms',   get: r => String(r.unit?.bathrooms || '—'), num: r => r.unit?.bathrooms || 0, best: 'high' },
+        { label: 'Area (sqm)',  get: r => `${r.unit?.area || '—'}`,         num: r => r.unit?.area || 0,      best: 'high' },
+        { label: 'Price',       get: r => shortCur(r.unit?.price),          num: r => r.unit?.price || 0,     best: 'low'  },
+        { label: '/sqm',        get: r => shortCur(r.unit?.pricePerSqm || (r.unit?.price && r.unit?.area ? r.unit.price / r.unit.area : 0)),
+                                num: r => r.unit?.pricePerSqm || (r.unit?.price && r.unit?.area ? r.unit.price / r.unit.area : 0), best: 'low' },
+        { label: 'Finishing',   get: r => fmtFin(r.unit?.finishingType) },
+        { label: 'Floor',       get: r => r.unit?.floor ? `Floor ${r.unit.floor}` : '—' },
+        { label: 'View',        get: r => cap(r.unit?.view || '—') },
+        { label: 'Match',       get: r => `${r.matchPercentage}%`,          num: r => r.matchPercentage,      best: 'high' },
+        // Investment metrics
+        { label: 'Appreciation', get: r => r.unit?.appreciationRate != null ? `${r.unit.appreciationRate}%` : '—', num: r => r.unit?.appreciationRate ?? 0, best: 'high' },
+        { label: 'Rent Yield',   get: r => r.unit?.rentYield != null ? `${r.unit.rentYield}%` : '—',               num: r => r.unit?.rentYield ?? 0,          best: 'high' },
+        { label: 'Value/Money',  get: r => r.unit?.valueForMoney != null ? `${r.unit.valueForMoney}/10` : '—',     num: r => r.unit?.valueForMoney ?? 0,       best: 'high' },
+        { label: 'Payment Plan', get: r => r.unit?.paymentPlan || '—' },
     ];
 
     const rowH = 26;
     attrs.forEach((attr, ai) => {
+        if (y + rowH > 790) return; // guard against overflow
         const rowBg = ai % 2 === 0 ? C.white : C.offWhite;
         doc.rect(mx, y, cw, rowH).fill(rowBg);
 
@@ -636,7 +709,240 @@ function pageSideBySide(doc, results) {
 }
 
 // ═══════════════════════════════════════════════════════
-// PAGE 6 — RECOMMENDATION (split layout)
+// PAGE 6 — ROI ANALYSIS (NEW)
+// ═══════════════════════════════════════════════════════
+function pageROI(doc, results) {
+    const validResults = results.filter(r => r.unit?.price && (r.unit?.appreciationRate != null || r.unit?.rentYield != null));
+    if (!validResults.length) return;
+
+    doc.addPage({ margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    const W = doc.page.width;
+
+    doc.rect(0, 0, W, doc.page.height).fill(C.cream);
+    doc.rect(0, 0, W, 68).fill(C.black);
+    doc.rect(0, 68, W, 2).fill(C.gold);
+    doc.fontSize(8).fillColor(C.gold).font('Helvetica-Bold')
+        .text('06  ·  ROI ANALYSIS', 52, 18, { characterSpacing: 1 });
+    doc.fontSize(22).fillColor(C.white).font('Helvetica-Bold')
+        .text('Investment Return Analysis', 52, 33);
+    doc.fontSize(8.5).fillColor(C.txtMute).font('Helvetica')
+        .text('REALESTATE PRO', W - 170, 30, { width: 118, align: 'right' });
+
+    const mx = 52, cw = W - mx * 2;
+    const n = Math.min(validResults.length, 3);
+    // Label column width + unit columns
+    const labelW = 132;
+    const unitColW = Math.floor((cw - labelW - (n) * 6) / n);
+
+    let y = 82;
+
+    // ── Combined ROI summary strip ──
+    const stripH = 70;
+    doc.roundedRect(mx, y, cw, stripH, 6).fill(C.black2);
+    doc.rect(mx, y, cw, 2).fill(C.gold);
+
+    doc.fontSize(7.5).fillColor(C.gold).font('Helvetica-Bold')
+        .text('COMBINED ROI COMPARISON', mx + 14, y + 10, { characterSpacing: 0.8 });
+
+    const roiColW = Math.floor((cw - 28) / n);
+    validResults.slice(0, n).forEach((r, i) => {
+        const roi = calcUnitROI(r.unit);
+        const cx = mx + 14 + i * roiColW;
+        doc.fontSize(9).fillColor(C.txtMute).font('Helvetica')
+            .text(r.unit?.compound?.name || '—', cx, y + 24, { width: roiColW - 10, lineBreak: false });
+        doc.fontSize(22).fillColor(roi?.combinedROI != null ? C.gold : C.txtMute).font('Helvetica-Bold')
+            .text(roi?.combinedROI != null ? `${roi.combinedROI.toFixed(1)}%` : '—', cx, y + 36, { width: roiColW - 10, lineBreak: false });
+        doc.fontSize(7.5).fillColor(C.txtMute).font('Helvetica')
+            .text('/ year combined ROI', cx, y + 60, { width: roiColW - 10, lineBreak: false });
+    });
+
+    y += stripH + 14;
+
+    // ── Annual breakdown table ──
+    sectionLabel(doc, 'ANNUAL RETURN BREAKDOWN', mx, y);
+    y += 14;
+
+    // Table header
+    const tableHeaderH = 24;
+    doc.rect(mx, y, cw, tableHeaderH).fill(C.black3);
+    doc.fontSize(7.5).fillColor(C.gold).font('Helvetica-Bold')
+        .text('Metric', mx + 8, y + 8);
+    validResults.slice(0, n).forEach((r, i) => {
+        const cx = mx + labelW + 6 + i * (unitColW + 6);
+        doc.fontSize(7.5).fillColor(C.white).font('Helvetica-Bold')
+            .text(r.unit?.compound?.name || '—', cx, y + 8, { width: unitColW, align: 'center', lineBreak: false });
+    });
+    y += tableHeaderH;
+
+    const annualRows = [
+        {
+            label: 'Annual Rental Income',
+            get: r => { const roi = calcUnitROI(r.unit); return roi?.annualRent != null ? shortCur(roi.annualRent) : '—'; },
+            num: r => calcUnitROI(r.unit)?.annualRent ?? 0,
+            best: 'high',
+            col: C.teal,
+        },
+        {
+            label: 'Annual Capital Gain',
+            get: r => { const roi = calcUnitROI(r.unit); return roi?.annualCapGain != null ? shortCur(roi.annualCapGain) : '—'; },
+            num: r => calcUnitROI(r.unit)?.annualCapGain ?? 0,
+            best: 'high',
+            col: C.green,
+        },
+        {
+            label: 'Total Annual Return',
+            get: r => { const roi = calcUnitROI(r.unit); return roi?.totalAnnualReturn != null ? shortCur(roi.totalAnnualReturn) : '—'; },
+            num: r => calcUnitROI(r.unit)?.totalAnnualReturn ?? 0,
+            best: 'high',
+            col: C.gold,
+        },
+    ];
+
+    const annualRowH = 28;
+    annualRows.forEach((row, ri) => {
+        const bg = ri % 2 === 0 ? C.white : C.offWhite;
+        doc.rect(mx, y, cw, annualRowH).fill(bg);
+        doc.fontSize(8.5).fillColor(C.txtSub).font('Helvetica')
+            .text(row.label, mx + 8, y + 9, { width: labelW - 12, lineBreak: false });
+
+        const vals = validResults.slice(0, n).map(row.num);
+        const bestVal = Math.max(...vals.filter(v => v > 0));
+
+        validResults.slice(0, n).forEach((r, i) => {
+            const cx = mx + labelW + 6 + i * (unitColW + 6);
+            const val = row.get(r);
+            const numVal = row.num(r);
+            const isBest = numVal > 0 && numVal === bestVal && vals.filter(v => v === bestVal).length === 1;
+            if (isBest) doc.rect(cx, y + 2, unitColW, annualRowH - 4).fill(C.goldPale);
+            doc.fontSize(9).fillColor(isBest ? C.goldDk : C.txtMed)
+                .font(isBest ? 'Helvetica-Bold' : 'Helvetica')
+                .text(val + (isBest ? ' ★' : ''), cx, y + 9, { width: unitColW, align: 'center', lineBreak: false });
+        });
+        doc.rect(mx, y + annualRowH - 0.5, cw, 0.5).fill(C.border);
+        y += annualRowH;
+    });
+
+    // ── Visual composition bar ──
+    y += 14;
+    sectionLabel(doc, 'RETURN COMPOSITION  (Rental vs Capital)', mx, y);
+    y += 14;
+
+    validResults.slice(0, n).forEach((r, i) => {
+        const roi = calcUnitROI(r.unit);
+        if (!roi?.totalAnnualReturn) return;
+        const barW = Math.floor((cw - (n - 1) * 10) / n);
+        const bx = mx + i * (barW + 10);
+
+        doc.fontSize(7.5).fillColor(C.txtSub).font('Helvetica')
+            .text(r.unit?.compound?.name || '—', bx, y, { width: barW, lineBreak: false });
+
+        const trackH = 12;
+        doc.roundedRect(bx, y + 12, barW, trackH, 3).fill(C.offWhite);
+
+        if (roi.annualRent != null && roi.annualCapGain != null) {
+            const total = roi.annualRent + roi.annualCapGain;
+            const rentW = Math.round((roi.annualRent / total) * barW);
+            const capW = barW - rentW;
+            if (rentW > 0) {
+                doc.save();
+                doc.roundedRect(bx, y + 12, barW, trackH, 3).clip();
+                doc.rect(bx, y + 12, rentW, trackH).fill(C.teal);
+                doc.restore();
+            }
+            if (capW > 0) {
+                doc.save();
+                doc.roundedRect(bx, y + 12, barW, trackH, 3).clip();
+                doc.rect(bx + rentW, y + 12, capW, trackH).fill(C.green);
+                doc.restore();
+            }
+            doc.fontSize(6.5).fillColor(C.teal).font('Helvetica-Bold')
+                .text(`Rent ${Math.round(roi.annualRent / total * 100)}%`, bx, y + 27, { lineBreak: false });
+            doc.fontSize(6.5).fillColor(C.green).font('Helvetica-Bold')
+                .text(`Cap. ${Math.round(roi.annualCapGain / total * 100)}%`, bx + barW - 50, y + 27, { lineBreak: false, width: 50, align: 'right' });
+        } else {
+            // Single source
+            const fillColor = roi.annualRent != null ? C.teal : C.green;
+            doc.roundedRect(bx, y + 12, barW, trackH, 3).fill(fillColor);
+            doc.fontSize(6.5).fillColor(fillColor).font('Helvetica-Bold')
+                .text(roi.annualRent != null ? 'Rental only' : 'Capital only', bx, y + 27, { lineBreak: false });
+        }
+    });
+
+    y += 42;
+
+    // ── Projections table ──
+    sectionLabel(doc, 'PROJECTED RETURNS', mx, y);
+    y += 14;
+
+    // Table header row with horizon sub-columns
+    const projHeaderH = 28;
+    doc.rect(mx, y, cw, projHeaderH).fill(C.black3);
+    doc.fontSize(7.5).fillColor(C.gold).font('Helvetica-Bold')
+        .text('Horizon', mx + 8, y + 10);
+
+    validResults.slice(0, n).forEach((r, i) => {
+        const cx = mx + labelW + 6 + i * (unitColW + 6);
+        doc.fontSize(7).fillColor(C.white).font('Helvetica-Bold')
+            .text(r.unit?.compound?.name || '—', cx, y + 4, { width: unitColW, align: 'center', lineBreak: false });
+        // Sub-labels: Value · Return · ROI%
+        doc.fontSize(6.5).fillColor(C.txtMute).font('Helvetica')
+            .text('Value  /  Total Return  /  ROI', cx, y + 17, { width: unitColW, align: 'center', lineBreak: false });
+    });
+    y += projHeaderH;
+
+    const horizons = [
+        { label: '1 Year',   vKey: 'val1yr', tKey: null,     rKey: null     },
+        { label: '3 Years',  vKey: 'val3yr', tKey: 'total3yr', rKey: 'roi3yr' },
+        { label: '5 Years',  vKey: 'val5yr', tKey: 'total5yr', rKey: 'roi5yr' },
+    ];
+
+    const projRowH = 30;
+    horizons.forEach((h, hi) => {
+        const bg = hi % 2 === 0 ? C.white : C.offWhite;
+        doc.rect(mx, y, cw, projRowH).fill(bg);
+
+        // Label
+        doc.roundedRect(mx + 4, y + 6, 52, 18, 3).fill(C.black);
+        doc.fontSize(8).fillColor(C.gold).font('Helvetica-Bold')
+            .text(h.label, mx + 4, y + 11, { width: 52, align: 'center' });
+
+        validResults.slice(0, n).forEach((r, i) => {
+            const roi = calcUnitROI(r.unit);
+            const cx = mx + labelW + 6 + i * (unitColW + 6);
+
+            const projVal   = roi?.[h.vKey] ?? null;
+            const totalRet  = h.tKey ? roi?.[h.tKey] ?? null : (projVal != null ? projVal - r.unit.price : null);
+            const roiPct    = h.rKey ? roi?.[h.rKey] ?? null : null;
+
+            const parts = [
+                projVal != null  ? shortCur(projVal)               : '—',
+                totalRet != null ? `+${shortCur(totalRet)}`        : '',
+                roiPct != null   ? `${roiPct.toFixed(0)}% ROI`    : '',
+            ].filter(Boolean).join('  ·  ');
+
+            doc.fontSize(8).fillColor(C.txtMed).font('Helvetica')
+                .text(parts, cx, y + 10, { width: unitColW, align: 'center', lineBreak: false });
+        });
+
+        doc.rect(mx, y + projRowH - 0.5, cw, 0.5).fill(C.border);
+        y += projRowH;
+    });
+
+    doc.roundedRect(mx, 82 + stripH + 14 + 14 + tableHeaderH, cw, y - (82 + stripH + 14 + 14 + tableHeaderH), 4)
+        .lineWidth(0.5).strokeColor(C.border).stroke();
+
+    // Legend
+    y += 8;
+    doc.rect(mx, y + 6, 10, 8).fill(C.teal);
+    doc.fontSize(7.5).fillColor(C.txtSub).font('Helvetica').text('Rental Income', mx + 14, y + 5, { lineBreak: false });
+    doc.rect(mx + 90, y + 6, 10, 8).fill(C.green);
+    doc.fontSize(7.5).fillColor(C.txtSub).font('Helvetica').text('Capital Gain', mx + 104, y + 5, { lineBreak: false });
+    doc.fontSize(8.5).fillColor(C.gold).font('Helvetica-Bold').text('★', mx + 190, y + 4, { lineBreak: false });
+    doc.fontSize(7.5).fillColor(C.txtSub).font('Helvetica').text(' Best in column', mx + 200, y + 5, { lineBreak: false });
+}
+
+// ═══════════════════════════════════════════════════════
+// PAGE 7 — RECOMMENDATION
 // ═══════════════════════════════════════════════════════
 function pageRecommendation(doc, topResult, requirements) {
     if (!topResult) return;
@@ -649,34 +955,27 @@ function pageRecommendation(doc, topResult, requirements) {
     // ── Left black panel (44%) ──
     const leftW = Math.round(W * 0.44);
     doc.rect(0, 0, leftW, H).fill(C.black);
-
-    // Gold top accent strip
     doc.rect(0, 0, leftW, 4).fill(C.gold);
 
-    // Decorative subtle circles on left panel
     doc.save();
     doc.circle(leftW * 0.5, H * 0.82, 130).lineWidth(0.5).strokeColor(C.goldRule).stroke();
     doc.circle(leftW * 0.5, H * 0.82, 95).lineWidth(0.3).strokeColor(C.goldRule).stroke();
     doc.restore();
 
-    // Page label
     doc.fontSize(8).fillColor(C.gold).font('Helvetica-Bold')
-        .text('06  ·  RECOMMENDATION', 22, 18, { characterSpacing: 1 });
+        .text('07  ·  RECOMMENDATION', 22, 18, { characterSpacing: 1 });
 
-    // "#1 Recommended" — outlined badge
     doc.roundedRect(22, 38, 122, 22, 4)
         .lineWidth(1).strokeColor(C.gold).stroke();
     doc.fontSize(8).fillColor(C.gold).font('Helvetica-Bold')
         .text('#1 RECOMMENDED', 22, 44, { width: 122, align: 'center' });
 
-    // Score ring
     const ringCX = leftW / 2, ringCY = 192;
     bigRing(doc, ringCX, ringCY, 58, topResult.matchPercentage, C.gold);
 
     doc.fontSize(8.5).fillColor(C.txtMute).font('Helvetica')
         .text('MATCH SCORE', 0, ringCY + 72, { width: leftW, align: 'center' });
 
-    // Property name
     doc.fontSize(15).fillColor(C.white).font('Helvetica-Bold')
         .text(compound.name || '—', 14, ringCY + 90, { width: leftW - 28, align: 'center' });
     doc.fontSize(9).fillColor(C.txtSub).font('Helvetica')
@@ -684,10 +983,8 @@ function pageRecommendation(doc, topResult, requirements) {
     doc.fontSize(8.5).fillColor(C.txtMute).font('Helvetica')
         .text(compound.location || '—', 14, ringCY + 132, { width: leftW - 28, align: 'center' });
 
-    // Thin gold rule
     doc.rect(22, ringCY + 156, leftW - 44, 0.5).fill(C.gold);
 
-    // Why this property
     doc.fontSize(8).fillColor(C.gold).font('Helvetica-Bold')
         .text('WHY THIS PROPERTY', 22, ringCY + 170, { characterSpacing: 1 });
 
@@ -711,7 +1008,6 @@ function pageRecommendation(doc, topResult, requirements) {
     doc.rect(rightX, 0, 1, H).fill(C.border);
     doc.rect(rightX, 0, rightW, 4).fill(C.gold);
 
-    // Section header
     doc.fontSize(11).fillColor(C.txt).font('Helvetica-Bold')
         .text('Property Details', rightX + 24, 22);
     doc.rect(rightX + 24, 42, rightW - 48, 0.5).fill(C.border);
@@ -752,8 +1048,18 @@ function pageRecommendation(doc, topResult, requirements) {
     doc.fontSize(10).fillColor(C.gold).font('Helvetica-Bold')
         .text(`${shortCur(ppsqm)}/sqm`, rightX + 24, priceY + 30, { width: rightW - 48, align: 'right' });
 
+    // Payment plan (if available)
+    if (unit.paymentPlan) {
+        doc.roundedRect(rightX + 24, priceY + 60, rightW - 48, 22, 3).fill(C.goldPale);
+        doc.rect(rightX + 24, priceY + 60, rightW - 48, 1.5).fill(C.gold);
+        doc.fontSize(7.5).fillColor(C.goldDk).font('Helvetica-Bold')
+            .text('PAYMENT PLAN  ', rightX + 36, priceY + 67, { continued: true });
+        doc.fontSize(7.5).fillColor(C.txtMed).font('Helvetica')
+            .text(unit.paymentPlan, { width: rightW - 80, lineBreak: false });
+    }
+
     // Score breakdown
-    const scoresY = priceY + 72;
+    const scoresY = priceY + (unit.paymentPlan ? 90 : 72);
     doc.fontSize(9).fillColor(C.txt).font('Helvetica-Bold')
         .text('Score Breakdown', rightX + 24, scoresY);
 
@@ -765,6 +1071,41 @@ function pageRecommendation(doc, topResult, requirements) {
         const by = scoresY + 16 + row * 32;
         fullBar(doc, bx, by, bW, key, val, C.gold);
     });
+
+    // ── Investment Highlights box (NEW) ──
+    const topROI = calcUnitROI(unit);
+    if (topROI && (topROI.combinedROI != null || topROI.totalAnnualReturn != null)) {
+        const invBoxY = scoresY + 16 + Math.ceil(scoreEntries.length / 2) * 32 + 10;
+        const invBoxW = rightW - 48;
+        const invBoxH = 68;
+
+        // Guard: only render if it fits on the page
+        if (invBoxY + invBoxH < H - 60) {
+            doc.roundedRect(rightX + 24, invBoxY, invBoxW, invBoxH, 5).fill(C.goldPale);
+            doc.roundedRect(rightX + 24, invBoxY, invBoxW, invBoxH, 5)
+                .lineWidth(0.5).strokeColor(C.border).stroke();
+            doc.rect(rightX + 24, invBoxY, invBoxW, 2).fill(C.gold);
+
+            doc.fontSize(7.5).fillColor(C.goldDk).font('Helvetica-Bold')
+                .text('INVESTMENT HIGHLIGHTS', rightX + 38, invBoxY + 10, { characterSpacing: 0.8 });
+
+            const invMetrics = [
+                topROI.combinedROI != null        ? { l: 'ROI/yr',       v: `${topROI.combinedROI.toFixed(1)}%`    } : null,
+                topROI.totalAnnualReturn != null  ? { l: 'Annual Return', v: shortCur(topROI.totalAnnualReturn)    } : null,
+                topROI.val5yr != null             ? { l: '5-yr Value',   v: shortCur(topROI.val5yr)                } : null,
+                topROI.roi5yr != null             ? { l: '5-yr ROI',     v: `${topROI.roi5yr.toFixed(0)}%`         } : null,
+            ].filter(Boolean);
+
+            const metricColW = Math.floor(invBoxW / 4);
+            invMetrics.slice(0, 4).forEach((m, i) => {
+                const mx2 = rightX + 24 + i * metricColW;
+                doc.fontSize(6.5).fillColor(C.txtMute).font('Helvetica')
+                    .text(m.l.toUpperCase(), mx2, invBoxY + 26, { width: metricColW, align: 'center' });
+                doc.fontSize(11).fillColor(C.goldDk).font('Helvetica-Bold')
+                    .text(m.v, mx2, invBoxY + 40, { width: metricColW, align: 'center' });
+            });
+        }
+    }
 
     // CTA bar — full width
     const ctaH = 52;
@@ -802,9 +1143,7 @@ function addFooters(doc) {
 
 function bigRing(doc, cx, cy, r, pct, color) {
     const lw = 9;
-    // Track circle
     doc.circle(cx, cy, r).lineWidth(lw).strokeColor(C.black4).stroke();
-    // Filled arc
     if (pct > 0) {
         const a0 = -Math.PI / 2;
         const a1 = a0 + (2 * Math.PI * Math.min(pct, 99.9) / 100);

@@ -217,6 +217,32 @@ export default function UnitComparison() {
 
     const removeSelected = (id) => setSelected((prev) => prev.filter((s) => s.id !== id));
 
+    const [pdfLoading, setPdfLoading] = useState(false);
+
+    const downloadPDF = async () => {
+        if (selected.length < 2) return;
+        setPdfLoading(true);
+        try {
+            const res = await fetch('/api/reports/unit-pdf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ unitIds: selected.map((u) => u.id) }),
+            });
+            if (!res.ok) throw new Error('PDF generation failed');
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `unit-comparison-${new Date().toISOString().split('T')[0]}.pdf`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            alert('Failed to generate PDF: ' + err.message);
+        } finally {
+            setPdfLoading(false);
+        }
+    };
+
     const get = (u, key) => u[key];
 
     if (loading) {
@@ -238,9 +264,20 @@ export default function UnitComparison() {
                     </p>
                 </div>
                 {selected.length > 0 && (
-                    <button className="btn btn-secondary btn-sm" onClick={() => setSelected([])}>
-                        Clear Selection
-                    </button>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        {selected.length >= 2 && (
+                            <button
+                                className="btn btn-primary btn-sm"
+                                onClick={downloadPDF}
+                                disabled={pdfLoading}
+                            >
+                                {pdfLoading ? 'Generating…' : '⬇ Download PDF'}
+                            </button>
+                        )}
+                        <button className="btn btn-secondary btn-sm" onClick={() => setSelected([])}>
+                            Clear Selection
+                        </button>
+                    </div>
                 )}
             </div>
 

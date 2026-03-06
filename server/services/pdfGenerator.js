@@ -1259,3 +1259,386 @@ function parseArr(val) {
         return Array.isArray(a) && a.length ? a : null;
     } catch { return null; }
 }
+
+// ═══════════════════════════════════════════════════════
+// UNIT COMPARISON PDF — dedicated pages (unit objects directly)
+// ═══════════════════════════════════════════════════════
+
+function pageUnitCover(doc, units) {
+    const W = doc.page.width, H = doc.page.height;
+
+    doc.rect(0, 0, W, H).fill(C.black);
+
+    // Decorative arcs
+    doc.save();
+    doc.circle(W + 50, -30, 290).lineWidth(0.7).strokeColor(C.goldRule).stroke();
+    doc.circle(W + 50, -30, 220).lineWidth(0.4).strokeColor(C.goldRule).stroke();
+    doc.restore();
+    doc.save();
+    doc.circle(-50, H + 40, 250).lineWidth(0.5).strokeColor(C.goldRule).stroke();
+    doc.restore();
+
+    // Diagonal corner accent
+    doc.save();
+    doc.moveTo(W - 130, 0).lineTo(W, 0).lineTo(W, 130).closePath().fill(C.goldDk);
+    doc.moveTo(W - 78, 0).lineTo(W, 0).lineTo(W, 78).closePath().fill(C.gold);
+    doc.restore();
+
+    // Brand
+    doc.rect(52, 40, 4, 4).fill(C.gold);
+    doc.fontSize(8.5).fillColor(C.txtMute).font('Helvetica')
+        .text('REALESTATE PRO  ·  Property Intelligence', 62, 39, { characterSpacing: 0.4 });
+    doc.rect(52, 56, W - 104, 0.5).fill(C.goldRule);
+
+    // Main title
+    doc.fontSize(62).fillColor(C.white).font('Helvetica-Bold')
+        .text('Unit', 52, 84, { lineBreak: false });
+    doc.fontSize(62).fillColor(C.white).font('Helvetica-Bold')
+        .text('Comparison', 52, 156, { lineBreak: false });
+    doc.fontSize(62).fillColor(C.gold).font('Helvetica-Bold')
+        .text('Report.', 52, 228, { lineBreak: false });
+
+    doc.rect(52, 308, 210, 1.5).fill(C.gold);
+    doc.fontSize(10.5).fillColor(C.txtMute).font('Helvetica')
+        .text(`${units.length} Units — Side-by-Side Analysis`, 52, 320);
+
+    const yr = new Date().getFullYear();
+    doc.roundedRect(52, 350, 58, 22, 3).lineWidth(1).strokeColor(C.gold).stroke();
+    doc.fontSize(9).fillColor(C.gold).font('Helvetica-Bold')
+        .text(String(yr), 52, 356, { width: 58, align: 'center' });
+
+    // Units list card
+    const cardY = 392;
+    const cardW = Math.round(W * 0.58);
+    const cardH = 28 + units.length * 26;
+    doc.roundedRect(52, cardY, cardW, cardH, 6).fill(C.black3);
+    doc.rect(52, cardY, 3, cardH).fill(C.gold);
+
+    doc.fontSize(7.5).fillColor(C.gold).font('Helvetica-Bold')
+        .text('SELECTED UNITS', 68, cardY + 10, { characterSpacing: 1 });
+
+    units.forEach((u, i) => {
+        const uy = cardY + 28 + i * 26;
+        doc.fontSize(9.5).fillColor(C.white).font('Helvetica-Bold')
+            .text(`${i + 1}.  ${u.compound?.name || '—'}`, 68, uy, { width: cardW - 32, lineBreak: false });
+        doc.fontSize(7.5).fillColor(C.txtSub).font('Helvetica')
+            .text(`${cap(u.type || '—')}  ·  ${shortCur(u.price)}  ·  ${u.compound?.location || '—'}`, 68, uy + 13, { width: cardW - 32, lineBreak: false });
+    });
+
+    const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    doc.fontSize(8.5).fillColor(C.txtMute).font('Helvetica').text(today, 52, H - 50);
+}
+
+function pageUnitSideBySide(doc, units) {
+    doc.addPage({ margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    const W = doc.page.width;
+
+    doc.rect(0, 0, W, doc.page.height).fill(C.cream);
+    doc.rect(0, 0, W, 68).fill(C.black);
+    doc.rect(0, 68, W, 2).fill(C.gold);
+    doc.fontSize(8).fillColor(C.gold).font('Helvetica-Bold')
+        .text('02  ·  SIDE-BY-SIDE COMPARISON', 52, 18, { characterSpacing: 1 });
+    doc.fontSize(22).fillColor(C.white).font('Helvetica-Bold')
+        .text('Unit Details Comparison', 52, 33);
+    doc.fontSize(8.5).fillColor(C.txtMute).font('Helvetica')
+        .text('REALESTATE PRO', W - 170, 30, { width: 118, align: 'right' });
+
+    const mx = 52, cw = W - mx * 2;
+    const n = Math.min(units.length, 4);
+    const colW = Math.floor((cw - (n - 1) * 8) / n);
+    const colXs = Array.from({ length: n }, (_, i) => mx + i * (colW + 8));
+
+    let y = 82;
+
+    // Column headers
+    colXs.forEach((cx, i) => {
+        const u = units[i];
+        doc.roundedRect(cx, y, colW, 58, 5).fill(C.black);
+        doc.roundedRect(cx, y, colW, 58, 5)
+            .lineWidth(i === 0 ? 1.5 : 0.5).strokeColor(i === 0 ? C.gold : C.borderDk).stroke();
+        doc.rect(cx, y, colW, 3).fill(i === 0 ? C.gold : C.goldDk);
+        doc.fontSize(11).fillColor(C.white).font('Helvetica-Bold')
+            .text(u.compound?.name || `Unit ${i + 1}`, cx + 6, y + 14, { width: colW - 12, align: 'center' });
+        doc.fontSize(7.5).fillColor(C.txtMute).font('Helvetica')
+            .text(`${cap(u.type || '—')}  ·  ${u.compound?.location || '—'}`, cx + 4, y + 38, { width: colW - 8, align: 'center', lineBreak: false });
+    });
+    y += 66;
+
+    const attrs = [
+        { label: 'Developer',    get: u => u.compound?.developer?.name || '—' },
+        { label: 'Location',     get: u => u.compound?.location || '—' },
+        { label: 'Type',         get: u => cap(u.type || '—') },
+        { label: 'Bedrooms',     get: u => String(u.bedrooms || '—'), num: u => u.bedrooms || 0, best: 'high' },
+        { label: 'Bathrooms',    get: u => String(u.bathrooms || '—'), num: u => u.bathrooms || 0, best: 'high' },
+        { label: 'Area (sqm)',   get: u => u.area ? `${u.area}` : '—', num: u => u.area || 0, best: 'high' },
+        { label: 'Price',        get: u => shortCur(u.price), num: u => u.price || 0, best: 'low' },
+        { label: '/sqm',         get: u => shortCur(u.pricePerSqm || (u.price && u.area ? u.price / u.area : 0)),
+                                 num: u => u.pricePerSqm || (u.price && u.area ? u.price / u.area : 0), best: 'low' },
+        { label: 'Finishing',    get: u => fmtFin(u.finishingType) },
+        { label: 'Floor',        get: u => u.floor ? `Floor ${u.floor}` : '—' },
+        { label: 'View',         get: u => cap(u.view || '—') },
+        { label: 'Appreciation', get: u => u.appreciationRate != null ? `${u.appreciationRate}%` : '—', num: u => u.appreciationRate ?? 0, best: 'high' },
+        { label: 'Rent Yield',   get: u => u.rentYield != null ? `${u.rentYield}%` : '—', num: u => u.rentYield ?? 0, best: 'high' },
+        { label: 'Value/Money',  get: u => u.valueForMoney != null ? `${u.valueForMoney}/10` : '—', num: u => u.valueForMoney ?? 0, best: 'high' },
+        { label: 'Payment Plan', get: u => u.paymentPlan || '—' },
+    ];
+
+    const rowH = 26;
+    attrs.forEach((attr, ai) => {
+        if (y + rowH > 790) return;
+        const rowBg = ai % 2 === 0 ? C.white : C.offWhite;
+        doc.rect(mx, y, cw, rowH).fill(rowBg);
+
+        doc.fontSize(8).fillColor(C.txtSub).font('Helvetica-Bold')
+            .text(attr.label, mx + 4, y + 9);
+
+        let bestIdx = -1;
+        if (attr.num && attr.best) {
+            const vals = units.slice(0, n).map(attr.num);
+            bestIdx = attr.best === 'high'
+                ? vals.indexOf(Math.max(...vals))
+                : vals.indexOf(Math.min(...vals.filter(v => v > 0)));
+        }
+
+        colXs.forEach((cx, ci) => {
+            const val = attr.get(units[ci]);
+            const isBest = bestIdx === ci;
+            if (isBest) doc.rect(cx + 2, y + 2, colW - 4, rowH - 4).fill(C.goldPale);
+            doc.fontSize(9)
+                .fillColor(isBest ? C.goldDk : C.txtMed)
+                .font(isBest ? 'Helvetica-Bold' : 'Helvetica')
+                .text(val + (isBest ? ' ★' : ''), cx + 4, y + 9, { width: colW - 8, align: 'center', lineBreak: false });
+        });
+
+        doc.rect(mx, y + rowH - 0.5, cw, 0.5).fill(C.border);
+        y += rowH;
+    });
+
+    doc.roundedRect(mx, 82 + 66, cw, y - 82 - 66, 4)
+        .lineWidth(0.5).strokeColor(C.border).stroke();
+
+    y += 10;
+    doc.fontSize(8.5).fillColor(C.gold).font('Helvetica-Bold').text('★', mx, y, { lineBreak: false });
+    doc.fontSize(8.5).fillColor(C.txtSub).font('Helvetica').text('  Best value in category', mx + 12, y);
+}
+
+function pageUnitROI(doc, units) {
+    const validUnits = units.filter(u => u.price && (u.appreciationRate != null || u.rentYield != null));
+    if (!validUnits.length) return;
+
+    doc.addPage({ margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    const W = doc.page.width;
+
+    doc.rect(0, 0, W, doc.page.height).fill(C.cream);
+    doc.rect(0, 0, W, 68).fill(C.black);
+    doc.rect(0, 68, W, 2).fill(C.gold);
+    doc.fontSize(8).fillColor(C.gold).font('Helvetica-Bold')
+        .text('03  ·  ROI ANALYSIS', 52, 18, { characterSpacing: 1 });
+    doc.fontSize(22).fillColor(C.white).font('Helvetica-Bold')
+        .text('Investment Return Analysis', 52, 33);
+    doc.fontSize(8.5).fillColor(C.txtMute).font('Helvetica')
+        .text('REALESTATE PRO', W - 170, 30, { width: 118, align: 'right' });
+
+    const mx = 52, cw = W - mx * 2;
+    const n = Math.min(validUnits.length, 4);
+    const labelW = 132;
+    const unitColW = Math.floor((cw - labelW - n * 6) / n);
+
+    let y = 82;
+
+    // Combined ROI strip
+    const stripH = 70;
+    doc.roundedRect(mx, y, cw, stripH, 6).fill(C.black2);
+    doc.rect(mx, y, cw, 2).fill(C.gold);
+    doc.fontSize(7.5).fillColor(C.gold).font('Helvetica-Bold')
+        .text('COMBINED ROI COMPARISON', mx + 14, y + 10, { characterSpacing: 0.8 });
+
+    const roiColW = Math.floor((cw - 28) / n);
+    validUnits.slice(0, n).forEach((u, i) => {
+        const roi = calcUnitROI(u);
+        const cx = mx + 14 + i * roiColW;
+        doc.fontSize(9).fillColor(C.txtMute).font('Helvetica')
+            .text(u.compound?.name || '—', cx, y + 24, { width: roiColW - 10, lineBreak: false });
+        doc.fontSize(22).fillColor(roi?.combinedROI != null ? C.gold : C.txtMute).font('Helvetica-Bold')
+            .text(roi?.combinedROI != null ? `${roi.combinedROI.toFixed(1)}%` : '—', cx, y + 36, { width: roiColW - 10, lineBreak: false });
+        doc.fontSize(7.5).fillColor(C.txtMute).font('Helvetica')
+            .text('/ year combined ROI', cx, y + 60, { width: roiColW - 10, lineBreak: false });
+    });
+    y += stripH + 14;
+
+    // Annual breakdown table
+    sectionLabel(doc, 'ANNUAL RETURN BREAKDOWN', mx, y);
+    y += 14;
+
+    const tableHeaderH = 24;
+    doc.rect(mx, y, cw, tableHeaderH).fill(C.black3);
+    doc.fontSize(7.5).fillColor(C.gold).font('Helvetica-Bold').text('Metric', mx + 8, y + 8);
+    validUnits.slice(0, n).forEach((u, i) => {
+        const cx = mx + labelW + 6 + i * (unitColW + 6);
+        doc.fontSize(7.5).fillColor(C.white).font('Helvetica-Bold')
+            .text(u.compound?.name || '—', cx, y + 8, { width: unitColW, align: 'center', lineBreak: false });
+    });
+    y += tableHeaderH;
+
+    const annualRows = [
+        { label: 'Annual Rental Income', get: u => { const r = calcUnitROI(u); return r?.annualRent != null ? shortCur(r.annualRent) : '—'; }, num: u => calcUnitROI(u)?.annualRent ?? 0 },
+        { label: 'Annual Capital Gain',  get: u => { const r = calcUnitROI(u); return r?.annualCapGain != null ? shortCur(r.annualCapGain) : '—'; }, num: u => calcUnitROI(u)?.annualCapGain ?? 0 },
+        { label: 'Total Annual Return',  get: u => { const r = calcUnitROI(u); return r?.totalAnnualReturn != null ? shortCur(r.totalAnnualReturn) : '—'; }, num: u => calcUnitROI(u)?.totalAnnualReturn ?? 0 },
+    ];
+
+    const annualRowH = 28;
+    annualRows.forEach((row, ri) => {
+        const bg = ri % 2 === 0 ? C.white : C.offWhite;
+        doc.rect(mx, y, cw, annualRowH).fill(bg);
+        doc.fontSize(8.5).fillColor(C.txtSub).font('Helvetica')
+            .text(row.label, mx + 8, y + 9, { width: labelW - 12, lineBreak: false });
+
+        const vals = validUnits.slice(0, n).map(row.num);
+        const bestVal = Math.max(...vals.filter(v => v > 0));
+        validUnits.slice(0, n).forEach((u, i) => {
+            const cx = mx + labelW + 6 + i * (unitColW + 6);
+            const val = row.get(u);
+            const numVal = row.num(u);
+            const isBest = numVal > 0 && numVal === bestVal && vals.filter(v => v === bestVal).length === 1;
+            if (isBest) doc.rect(cx, y + 2, unitColW, annualRowH - 4).fill(C.goldPale);
+            doc.fontSize(9).fillColor(isBest ? C.goldDk : C.txtMed)
+                .font(isBest ? 'Helvetica-Bold' : 'Helvetica')
+                .text(val + (isBest ? ' ★' : ''), cx, y + 9, { width: unitColW, align: 'center', lineBreak: false });
+        });
+        doc.rect(mx, y + annualRowH - 0.5, cw, 0.5).fill(C.border);
+        y += annualRowH;
+    });
+
+    // Composition bars
+    y += 14;
+    sectionLabel(doc, 'RETURN COMPOSITION  (Rental vs Capital)', mx, y);
+    y += 14;
+
+    validUnits.slice(0, n).forEach((u, i) => {
+        const roi = calcUnitROI(u);
+        if (!roi?.totalAnnualReturn) return;
+        const barW = Math.floor((cw - (n - 1) * 10) / n);
+        const bx = mx + i * (barW + 10);
+
+        doc.fontSize(7.5).fillColor(C.txtSub).font('Helvetica')
+            .text(u.compound?.name || '—', bx, y, { width: barW, lineBreak: false });
+
+        const trackH = 12;
+        doc.roundedRect(bx, y + 12, barW, trackH, 3).fill(C.offWhite);
+
+        if (roi.annualRent != null && roi.annualCapGain != null) {
+            const total = roi.annualRent + roi.annualCapGain;
+            const rentW = Math.round((roi.annualRent / total) * barW);
+            const capW = barW - rentW;
+            if (rentW > 0) {
+                doc.save();
+                doc.roundedRect(bx, y + 12, barW, trackH, 3).clip();
+                doc.rect(bx, y + 12, rentW, trackH).fill(C.teal);
+                doc.restore();
+            }
+            if (capW > 0) {
+                doc.save();
+                doc.roundedRect(bx, y + 12, barW, trackH, 3).clip();
+                doc.rect(bx + rentW, y + 12, capW, trackH).fill(C.green);
+                doc.restore();
+            }
+            doc.fontSize(6.5).fillColor(C.teal).font('Helvetica-Bold')
+                .text(`Rent ${Math.round(roi.annualRent / total * 100)}%`, bx, y + 27, { lineBreak: false });
+            doc.fontSize(6.5).fillColor(C.green).font('Helvetica-Bold')
+                .text(`Cap. ${Math.round(roi.annualCapGain / total * 100)}%`, bx + barW - 50, y + 27, { lineBreak: false, width: 50, align: 'right' });
+        } else {
+            const fillColor = roi.annualRent != null ? C.teal : C.green;
+            doc.roundedRect(bx, y + 12, barW, trackH, 3).fill(fillColor);
+            doc.fontSize(6.5).fillColor(fillColor).font('Helvetica-Bold')
+                .text(roi.annualRent != null ? 'Rental only' : 'Capital only', bx, y + 27, { lineBreak: false });
+        }
+    });
+
+    y += 42;
+
+    // Projections table
+    sectionLabel(doc, 'PROJECTED RETURNS', mx, y);
+    y += 14;
+
+    const projHeaderH = 28;
+    doc.rect(mx, y, cw, projHeaderH).fill(C.black3);
+    doc.fontSize(7.5).fillColor(C.gold).font('Helvetica-Bold').text('Horizon', mx + 8, y + 10);
+    validUnits.slice(0, n).forEach((u, i) => {
+        const cx = mx + labelW + 6 + i * (unitColW + 6);
+        doc.fontSize(7).fillColor(C.white).font('Helvetica-Bold')
+            .text(u.compound?.name || '—', cx, y + 4, { width: unitColW, align: 'center', lineBreak: false });
+        doc.fontSize(6.5).fillColor(C.txtMute).font('Helvetica')
+            .text('Value  /  Total Return  /  ROI', cx, y + 17, { width: unitColW, align: 'center', lineBreak: false });
+    });
+    y += projHeaderH;
+
+    const horizons = [
+        { label: '1 Year',  vKey: 'val1yr', tKey: null,       rKey: null },
+        { label: '3 Years', vKey: 'val3yr', tKey: 'total3yr', rKey: 'roi3yr' },
+        { label: '5 Years', vKey: 'val5yr', tKey: 'total5yr', rKey: 'roi5yr' },
+    ];
+
+    const projRowH = 30;
+    horizons.forEach((h, hi) => {
+        const bg = hi % 2 === 0 ? C.white : C.offWhite;
+        doc.rect(mx, y, cw, projRowH).fill(bg);
+        doc.roundedRect(mx + 4, y + 6, 52, 18, 3).fill(C.black);
+        doc.fontSize(8).fillColor(C.gold).font('Helvetica-Bold')
+            .text(h.label, mx + 4, y + 11, { width: 52, align: 'center' });
+
+        validUnits.slice(0, n).forEach((u, i) => {
+            const roi = calcUnitROI(u);
+            const cx = mx + labelW + 6 + i * (unitColW + 6);
+            const projVal  = roi?.[h.vKey] ?? null;
+            const totalRet = h.tKey ? roi?.[h.tKey] ?? null : null;
+            const roiPct   = h.rKey ? roi?.[h.rKey] ?? null : null;
+
+            const parts = [];
+            if (projVal != null)  parts.push(shortCur(projVal));
+            if (totalRet != null) parts.push(`+${shortCur(totalRet)}`);
+            if (roiPct != null)   parts.push(`${roiPct.toFixed(0)}% ROI`);
+
+            doc.fontSize(7.5).fillColor(C.txtMed).font('Helvetica')
+                .text(parts.join('  /  ') || '—', cx, y + 10, { width: unitColW, align: 'center', lineBreak: false });
+        });
+
+        doc.rect(mx, y + projRowH - 0.5, cw, 0.5).fill(C.border);
+        y += projRowH;
+    });
+}
+
+// ─────────────────────────────────────────────
+export async function generateUnitComparisonPDF(units) {
+    return new Promise((resolve, reject) => {
+        try {
+            const doc = new PDFDocument({
+                size: 'A4',
+                margins: { top: 0, bottom: 0, left: 0, right: 0 },
+                bufferPages: true,
+                info: {
+                    Title: 'Unit Comparison Report',
+                    Author: 'RealEstate Pro',
+                    Subject: 'Unit Comparison Report',
+                    Creator: 'RealEstate Pro'
+                }
+            });
+
+            const chunks = [];
+            doc.on('data', chunk => chunks.push(chunk));
+            doc.on('end', () => resolve(Buffer.concat(chunks)));
+            doc.on('error', reject);
+
+            pageUnitCover(doc, units);
+            pageUnitSideBySide(doc, units);
+
+            const hasROI = units.some(u => u.appreciationRate != null || u.rentYield != null);
+            if (hasROI) pageUnitROI(doc, units);
+
+            addFooters(doc);
+            doc.flushPages();
+            doc.end();
+        } catch (err) {
+            reject(err);
+        }
+    });
+}

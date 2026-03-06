@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 import { PrismaClient } from '@prisma/client';
 import multer from 'multer';
 import { compareUnits, generateComparisonSummary } from './services/comparisonEngine.js';
-import { generateComparisonPDF } from './services/pdfGenerator.js';
+import { generateComparisonPDF, generateUnitComparisonPDF } from './services/pdfGenerator.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const IS_PROD = process.env.NODE_ENV === 'production';
@@ -452,6 +452,39 @@ app.post('/api/reports/pdf', async (req, res) => {
         res.send(pdfBuffer);
     } catch (error) {
         console.error('PDF generation error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Generate PDF for selected units (unit comparison)
+app.post('/api/reports/unit-pdf', async (req, res) => {
+    try {
+        const { unitIds } = req.body;
+        if (!Array.isArray(unitIds) || unitIds.length < 2) {
+            return res.status(400).json({ error: 'At least 2 unit IDs are required' });
+        }
+
+        const units = await prisma.unit.findMany({
+            where: { id: { in: unitIds.map(Number) } },
+            include: { compound: { include: { developer: true } } }
+        });
+
+        // Preserve the user-selected order
+        const ordered = unitIds.map(id => units.find(u => u.id === Number(id))).filter(Boolean);
+
+        const pdfBuffer = await generateUnitComparisonPDF(ordered);
+
+        const timestamp = new Date().toISOString().split('T')[0];
+        const filename = `unit-comparison-${timestamp}.pdf`;
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Length', pdfBuffer.length);
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+
+        res.send(pdfBuffer);
+    } catch (error) {
+        console.error('Unit PDF generation error:', error);
         res.status(500).json({ error: error.message });
     }
 });

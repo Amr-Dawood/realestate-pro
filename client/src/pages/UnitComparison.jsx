@@ -169,6 +169,41 @@ function SectionRow({ label, colSpan }) {
     );
 }
 
+const PREF_CRITERIA = [
+    { key: 'price',           label: 'Price',            higherIsBetter: false },
+    { key: 'area',            label: 'Area (sqm)',        higherIsBetter: true  },
+    { key: 'bedrooms',        label: 'Bedrooms',          higherIsBetter: true  },
+    { key: 'bathrooms',       label: 'Bathrooms',         higherIsBetter: true  },
+    { key: 'rentYield',       label: 'Rent Yield',        higherIsBetter: true  },
+    { key: 'appreciationRate',label: 'Appreciation Rate', higherIsBetter: true  },
+    { key: 'valueForMoney',   label: 'Value for Money',   higherIsBetter: true  },
+];
+
+const DEFAULT_PREFS = Object.fromEntries(PREF_CRITERIA.map((c) => [c.key, 5]));
+
+function computeScores(units, prefs) {
+    return units.map((u) => {
+        let total = 0;
+        let maxPossible = 0;
+        PREF_CRITERIA.forEach(({ key, higherIsBetter }) => {
+            const weight = prefs[key] ?? 5;
+            if (weight === 0) return;
+            const vals = units.map((x) => x[key]).filter((v) => v != null);
+            if (vals.length < 2) return;
+            const min = Math.min(...vals);
+            const max = Math.max(...vals);
+            if (max === min) return; // all same — skip
+            const v = u[key];
+            if (v == null) return;
+            const norm = (v - min) / (max - min); // 0..1
+            const score = higherIsBetter ? norm : 1 - norm;
+            total += score * weight;
+            maxPossible += weight;
+        });
+        return { unit: u, score: maxPossible > 0 ? (total / maxPossible) * 100 : 0 };
+    });
+}
+
 export default function UnitComparison() {
     const [units, setUnits] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -176,6 +211,7 @@ export default function UnitComparison() {
     const [search, setSearch] = useState('');
     const [filterType, setFilterType] = useState('');
     const [filterCompound, setFilterCompound] = useState('');
+    const [prefs, setPrefs] = useState(DEFAULT_PREFS);
 
     useEffect(() => {
         fetch('/api/units')
@@ -357,6 +393,117 @@ export default function UnitComparison() {
                     </div>
                 </div>
             )}
+
+            {/* ---- PREFERENCES & RECOMMENDATION ---- */}
+            {selected.length >= 2 && (() => {
+                const scores = computeScores(selected, prefs);
+                const sorted = [...scores].sort((a, b) => b.score - a.score);
+                const winner = sorted[0];
+                const allZero = PREF_CRITERIA.every((c) => (prefs[c.key] ?? 5) === 0);
+                return (
+                    <div className="card mb-lg">
+                        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                            <h3 className="card-title">🎯 Preferences &amp; Recommendation</h3>
+                            <button
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => setPrefs(DEFAULT_PREFS)}
+                                style={{ fontSize: '0.72rem' }}
+                            >
+                                Reset
+                            </button>
+                        </div>
+                        <div style={{ padding: 'var(--space-md)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-lg)' }}>
+                            {/* Sliders */}
+                            <div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: 'var(--space-sm)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    Set your priorities (0 = not important, 10 = critical)
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                    {PREF_CRITERIA.map(({ key, label, higherIsBetter }) => (
+                                        <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                            <div style={{ width: 140, fontSize: '0.8rem', color: 'var(--color-text-secondary)', flexShrink: 0 }}>
+                                                {label}
+                                                <span style={{ fontSize: '0.65rem', color: 'var(--color-text-muted)', marginLeft: 4 }}>
+                                                    ({higherIsBetter ? '↑ higher' : '↓ lower'})
+                                                </span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min="0"
+                                                max="10"
+                                                step="1"
+                                                value={prefs[key] ?? 5}
+                                                onChange={(e) => setPrefs((p) => ({ ...p, [key]: Number(e.target.value) }))}
+                                                style={{ flex: 1, accentColor: 'var(--color-primary)', cursor: 'pointer' }}
+                                            />
+                                            <span style={{ width: 22, textAlign: 'right', fontSize: '0.82rem', fontWeight: 700, color: prefs[key] === 0 ? 'var(--color-text-muted)' : 'var(--color-primary)' }}>
+                                                {prefs[key] ?? 5}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Recommendation result */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
+                                {allZero ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
+                                        Set at least one preference weight above 0.
+                                    </div>
+                                ) : (
+                                    <>
+                                        {/* Winner banner */}
+                                        <div style={{
+                                            background: 'linear-gradient(135deg, rgba(16,185,129,0.12), rgba(59,130,246,0.08))',
+                                            border: '1px solid #10b981',
+                                            borderRadius: 'var(--radius-lg)',
+                                            padding: 'var(--space-md)',
+                                        }}>
+                                            <div style={{ fontSize: '0.68rem', color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4, fontWeight: 700 }}>
+                                                ✅ Recommended
+                                            </div>
+                                            <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--color-text-primary)' }}>
+                                                {winner.unit.compound?.name}
+                                            </div>
+                                            <div style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', marginTop: 2 }}>
+                                                {typeLabel[winner.unit.type] || winner.unit.type} · {winner.unit.compound?.developer?.name}
+                                            </div>
+                                            <div style={{ marginTop: 8, display: 'flex', gap: 12, fontSize: '0.78rem' }}>
+                                                <span style={{ color: '#10b981', fontWeight: 700 }}>Score: {winner.score.toFixed(0)}%</span>
+                                                <span style={{ color: 'var(--color-text-muted)' }}>{formatCurrency(winner.unit.price)}</span>
+                                                {winner.unit.area && <span style={{ color: 'var(--color-text-muted)' }}>{winner.unit.area} sqm</span>}
+                                            </div>
+                                        </div>
+
+                                        {/* All scores ranked */}
+                                        <div>
+                                            <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>All units ranked</div>
+                                            {sorted.map(({ unit: u, score }, rank) => (
+                                                <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                                                    <span style={{ width: 18, fontSize: '0.72rem', color: rank === 0 ? '#f59e0b' : 'var(--color-text-muted)', fontWeight: 700, textAlign: 'center' }}>
+                                                        {rank === 0 ? '🥇' : rank === 1 ? '🥈' : rank === 2 ? '🥉' : `#${rank + 1}`}
+                                                    </span>
+                                                    <div style={{ flex: 1 }}>
+                                                        <div style={{ fontSize: '0.78rem', color: 'var(--color-text-primary)', fontWeight: rank === 0 ? 700 : 400 }}>
+                                                            {u.compound?.name}
+                                                        </div>
+                                                        <div style={{ height: 4, borderRadius: 2, background: 'var(--color-bg-tertiary)', marginTop: 3, overflow: 'hidden' }}>
+                                                            <div style={{ height: '100%', width: `${score}%`, background: rank === 0 ? '#10b981' : rank === 1 ? '#3b82f6' : '#64748b', borderRadius: 2, transition: 'width 0.3s ease' }} />
+                                                        </div>
+                                                    </div>
+                                                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: rank === 0 ? '#10b981' : 'var(--color-text-secondary)', width: 36, textAlign: 'right' }}>
+                                                        {score.toFixed(0)}%
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* ---- COMPARISON TABLE ---- */}
             {selected.length >= 2 && (

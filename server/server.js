@@ -459,7 +459,7 @@ app.post('/api/reports/pdf', async (req, res) => {
 // Generate PDF for selected units (unit comparison)
 app.post('/api/reports/unit-pdf', async (req, res) => {
     try {
-        const { unitIds } = req.body;
+        const { unitIds, prefs } = req.body;
         if (!Array.isArray(unitIds) || unitIds.length < 2) {
             return res.status(400).json({ error: 'At least 2 unit IDs are required' });
         }
@@ -472,7 +472,7 @@ app.post('/api/reports/unit-pdf', async (req, res) => {
         // Preserve the user-selected order
         const ordered = unitIds.map(id => units.find(u => u.id === Number(id))).filter(Boolean);
 
-        const pdfBuffer = await generateUnitComparisonPDF(ordered);
+        const pdfBuffer = await generateUnitComparisonPDF(ordered, prefs || {});
 
         const timestamp = new Date().toISOString().split('T')[0];
         const filename = `unit-comparison-${timestamp}.pdf`;

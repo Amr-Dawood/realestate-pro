@@ -1608,7 +1608,188 @@ function pageUnitROI(doc, units) {
 }
 
 // ─────────────────────────────────────────────
-export async function generateUnitComparisonPDF(units) {
+// Scoring helpers (mirrors frontend computeScores)
+// ─────────────────────────────────────────────
+const PREF_CRITERIA = [
+    { key: 'price',            label: 'Price',             higherIsBetter: false },
+    { key: 'area',             label: 'Area (sqm)',         higherIsBetter: true  },
+    { key: 'bedrooms',         label: 'Bedrooms',           higherIsBetter: true  },
+    { key: 'bathrooms',        label: 'Bathrooms',          higherIsBetter: true  },
+    { key: 'rentYield',        label: 'Rent Yield',         higherIsBetter: true  },
+    { key: 'appreciationRate', label: 'Appreciation Rate',  higherIsBetter: true  },
+    { key: 'valueForMoney',    label: 'Value for Money',    higherIsBetter: true  },
+];
+
+function computeUnitScores(units, prefs = {}) {
+    return units.map((u) => {
+        let total = 0, maxPossible = 0;
+        PREF_CRITERIA.forEach(({ key, higherIsBetter }) => {
+            const weight = prefs[key] ?? 5;
+            if (weight === 0) return;
+            const vals = units.map(x => x[key]).filter(v => v != null);
+            if (vals.length < 2) return;
+            const min = Math.min(...vals), max = Math.max(...vals);
+            if (max === min) return;
+            const v = u[key];
+            if (v == null) return;
+            const norm = (v - min) / (max - min);
+            total += (higherIsBetter ? norm : 1 - norm) * weight;
+            maxPossible += weight;
+        });
+        return { unit: u, score: maxPossible > 0 ? (total / maxPossible) * 100 : 0 };
+    });
+}
+
+// ─────────────────────────────────────────────
+// Preference & Recommendation page
+// ─────────────────────────────────────────────
+function pageUnitPreferenceRec(doc, units, prefs) {
+    const scores = computeUnitScores(units, prefs);
+    const sorted = [...scores].sort((a, b) => b.score - a.score);
+    const winner = sorted[0];
+    if (!winner) return;
+
+    doc.addPage({ margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    const W = doc.page.width, H = doc.page.height;
+
+    // Background split: left black, right cream
+    const leftW = Math.round(W * 0.44);
+    doc.rect(0, 0, leftW, H).fill(C.black);
+    doc.rect(leftW, 0, W - leftW, H).fill(C.cream);
+
+    // Gold top stripe on both halves
+    doc.rect(0, 0, W, 4).fill(C.gold);
+
+    // Decorative ring on left
+    doc.save();
+    doc.circle(leftW * 0.5, H * 0.80, 120).lineWidth(0.5).strokeColor(C.goldRule).stroke();
+    doc.circle(leftW * 0.5, H * 0.80, 85).lineWidth(0.3).strokeColor(C.goldRule).stroke();
+    doc.restore();
+
+    // ── Left panel: winner ──
+    doc.fontSize(8).fillColor(C.gold).font('Helvetica-Bold')
+        .text('04  ·  RECOMMENDATION', 22, 18, { characterSpacing: 1 });
+
+    doc.roundedRect(22, 38, 122, 22, 4).lineWidth(1).strokeColor(C.gold).stroke();
+    doc.fontSize(8).fillColor(C.gold).font('Helvetica-Bold')
+        .text('#1 RECOMMENDED', 22, 44, { width: 122, align: 'center' });
+
+    // Score ring
+    const ringCX = leftW / 2, ringCY = 175;
+    bigRing(doc, ringCX, ringCY, 52, winner.score, C.gold);
+
+    doc.fontSize(8.5).fillColor(C.txtMute).font('Helvetica')
+        .text('PREFERENCE SCORE', 0, ringCY + 64, { width: leftW, align: 'center' });
+
+    doc.fontSize(15).fillColor(C.white).font('Helvetica-Bold')
+        .text(winner.unit.compound?.name || '—', 14, ringCY + 82, { width: leftW - 28, align: 'center' });
+    doc.fontSize(9).fillColor(C.txtSub).font('Helvetica')
+        .text(`${cap(winner.unit.type || '—')} by ${winner.unit.compound?.developer?.name || '—'}`, 14, ringCY + 104, { width: leftW - 28, align: 'center' });
+    doc.fontSize(8.5).fillColor(C.txtMute).font('Helvetica')
+        .text(winner.unit.compound?.location || '—', 14, ringCY + 120, { width: leftW - 28, align: 'center' });
+
+    // Price
+    doc.fontSize(13).fillColor(C.gold).font('Helvetica-Bold')
+        .text(fullCur(winner.unit.price), 14, ringCY + 142, { width: leftW - 28, align: 'center' });
+
+    doc.rect(22, ringCY + 164, leftW - 44, 0.5).fill(C.gold);
+
+    // All units ranked
+    doc.fontSize(8).fillColor(C.gold).font('Helvetica-Bold')
+        .text('ALL UNITS RANKED', 22, ringCY + 176, { characterSpacing: 1 });
+
+    const medals = ['🥇', '🥈', '🥉'];
+    let ry = ringCY + 196;
+    sorted.forEach(({ unit: u, score }, rank) => {
+        const barTrackW = leftW - 60;
+        const barFillW = Math.round(barTrackW * score / 100);
+        const fillColor = rank === 0 ? C.gold : rank === 1 ? C.teal : C.txtSub;
+
+        doc.fontSize(8).fillColor(rank === 0 ? C.gold : C.txtMute).font('Helvetica-Bold')
+            .text(`${rank + 1}.`, 22, ry, { width: 14, lineBreak: false });
+        doc.fontSize(8).fillColor(rank === 0 ? C.white : C.txtSub).font(rank === 0 ? 'Helvetica-Bold' : 'Helvetica')
+            .text(u.compound?.name || '—', 38, ry, { width: barTrackW - 10, lineBreak: false });
+
+        // Bar track
+        doc.roundedRect(38, ry + 12, barTrackW, 5, 2).fill(C.black4);
+        if (barFillW > 0) doc.roundedRect(38, ry + 12, barFillW, 5, 2).fill(fillColor);
+
+        doc.fontSize(7.5).fillColor(fillColor).font('Helvetica-Bold')
+            .text(`${score.toFixed(0)}%`, leftW - 26, ry + 10, { width: 24, align: 'right', lineBreak: false });
+
+        ry += 26;
+    });
+
+    // ── Right panel: preferences used ──
+    const rx = leftW + 24;
+    const rw = W - leftW - 48;
+
+    doc.fontSize(11).fillColor(C.txt).font('Helvetica-Bold').text('Your Preferences', rx, 22);
+    doc.rect(rx, 42, rw, 0.5).fill(C.border);
+
+    doc.fontSize(8).fillColor(C.txtSub).font('Helvetica')
+        .text('The recommendation is based on the following weights (0 = ignored, 10 = critical):', rx, 50, { width: rw });
+
+    let py = 72;
+    const sliderW = rw - 56;
+    PREF_CRITERIA.forEach(({ key, label, higherIsBetter }) => {
+        const weight = prefs[key] ?? 5;
+        const fillPct = weight / 10;
+
+        doc.fontSize(8.5).fillColor(C.txtSub).font('Helvetica')
+            .text(label, rx, py, { width: 115, lineBreak: false });
+        doc.fontSize(7).fillColor(C.txtMute).font('Helvetica')
+            .text(higherIsBetter ? '↑ higher' : '↓ lower', rx + 118, py + 1, { width: 46, lineBreak: false });
+
+        // Track
+        doc.roundedRect(rx + 168, py + 1, sliderW, 8, 3).fill(weight === 0 ? C.offWhite : C.cream);
+        doc.roundedRect(rx + 168, py + 1, sliderW, 8, 3).lineWidth(0.5).strokeColor(C.border).stroke();
+        if (fillPct > 0) {
+            const fw = Math.round(sliderW * fillPct);
+            doc.save();
+            doc.roundedRect(rx + 168, py + 1, sliderW, 8, 3).clip();
+            doc.rect(rx + 168, py + 1, fw, 8).fill(weight >= 8 ? C.gold : weight >= 4 ? C.teal : C.txtMute);
+            doc.restore();
+        }
+
+        doc.fontSize(8.5).fillColor(weight === 0 ? C.txtMute : C.txt).font('Helvetica-Bold')
+            .text(String(weight), rx + 168 + sliderW + 6, py, { width: 16, align: 'right', lineBreak: false });
+
+        py += 22;
+    });
+
+    // Winner key stats
+    py += 8;
+    doc.rect(rx, py, rw, 0.5).fill(C.border);
+    py += 12;
+    doc.fontSize(9).fillColor(C.txt).font('Helvetica-Bold').text('Winner Highlights', rx, py);
+    py += 16;
+
+    const wu = winner.unit;
+    const highlights = [
+        wu.bedrooms   != null ? `${wu.bedrooms} Bedrooms`                          : null,
+        wu.area       != null ? `${wu.area} sqm`                                   : null,
+        wu.price      != null ? fullCur(wu.price)                                  : null,
+        wu.rentYield  != null ? `${wu.rentYield}% Rent Yield`                      : null,
+        wu.appreciationRate != null ? `${wu.appreciationRate}% Appreciation`       : null,
+        wu.valueForMoney    != null ? `${wu.valueForMoney}/10 Value for Money`      : null,
+    ].filter(Boolean);
+
+    const hlColW = Math.floor((rw - 8) / 2);
+    highlights.forEach((h, i) => {
+        const col = i % 2, row = Math.floor(i / 2);
+        const hx = rx + col * (hlColW + 8);
+        const hy = py + row * 30;
+        doc.roundedRect(hx, hy, hlColW, 24, 4).fill(C.white);
+        doc.roundedRect(hx, hy, hlColW, 24, 4).lineWidth(0.5).strokeColor(C.border).stroke();
+        doc.rect(hx, hy, 3, 24).fill(C.gold);
+        doc.fontSize(9).fillColor(C.txt).font('Helvetica-Bold')
+            .text(h, hx + 10, hy + 7, { width: hlColW - 14, lineBreak: false });
+    });
+}
+
+// ─────────────────────────────────────────────
+export async function generateUnitComparisonPDF(units, prefs = {}) {
     return new Promise((resolve, reject) => {
         try {
             const doc = new PDFDocument({
@@ -1633,6 +1814,9 @@ export async function generateUnitComparisonPDF(units) {
 
             const hasROI = units.some(u => u.appreciationRate != null || u.rentYield != null);
             if (hasROI) pageUnitROI(doc, units);
+
+            const allZero = PREF_CRITERIA.every(c => (prefs[c.key] ?? 5) === 0);
+            if (!allZero) pageUnitPreferenceRec(doc, units, prefs);
 
             addFooters(doc);
             doc.flushPages();

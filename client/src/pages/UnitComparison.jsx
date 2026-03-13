@@ -262,7 +262,7 @@ export default function UnitComparison() {
             const res = await fetch('/api/reports/unit-pdf', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ unitIds: selected.map((u) => u.id) }),
+                body: JSON.stringify({ unitIds: selected.map((u) => u.id), prefs }),
             });
             if (!res.ok) throw new Error('PDF generation failed');
             const blob = await res.blob();

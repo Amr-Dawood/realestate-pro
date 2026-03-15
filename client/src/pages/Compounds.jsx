@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
+import 'leaflet/dist/leaflet.css';
+import LocationPicker from '../components/LocationPicker';
 
 export default function Compounds() {
     const [compounds, setCompounds] = useState([]);
     const [developers, setDevelopers] = useState([]);
+    const [showLocationPicker, setShowLocationPicker] = useState(false);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [editingCompound, setEditingCompound] = useState(null);
@@ -252,14 +255,26 @@ export default function Compounds() {
                                 <div className="form-row">
                                     <div className="form-group">
                                         <label className="form-label">Location *</label>
-                                        <input
-                                            type="text"
-                                            className="form-input"
-                                            value={formData.location}
-                                            onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                                            required
-                                            placeholder="e.g., 6th of October City"
-                                        />
+                                        <div style={{ display: 'flex', gap: 8 }}>
+                                            <input
+                                                type="text"
+                                                className="form-input"
+                                                style={{ flex: 1 }}
+                                                value={formData.location}
+                                                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                                                required
+                                                placeholder="e.g., 6th of October City"
+                                                readOnly
+                                            />
+                                            <button
+                                                type="button"
+                                                className="btn btn-secondary btn-sm"
+                                                onClick={() => setShowLocationPicker(true)}
+                                                style={{ whiteSpace: 'nowrap' }}
+                                            >
+                                                📍 Pick on Map
+                                            </button>
+                                        </div>
                                     </div>
                                     <div className="form-group">
                                         <label className="form-label">City</label>
@@ -330,6 +345,14 @@ export default function Compounds() {
                         </form>
                     </div>
                 </div>
+            )}
+
+            {showLocationPicker && (
+                <LocationPicker
+                    value={formData.location}
+                    onChange={(loc) => setFormData((f) => ({ ...f, location: loc }))}
+                    onClose={() => setShowLocationPicker(false)}
+                />
             )}
         </div>
     );

@@ -5,6 +5,12 @@ const MAX_SELECT = 4;
 const formatCurrency = (v) =>
     v != null ? new Intl.NumberFormat('en-EG', { style: 'currency', currency: 'EGP', maximumFractionDigits: 0 }).format(v) : '—';
 
+const formatNum = (v) =>
+    v != null ? new Intl.NumberFormat('en-EG').format(v) : '—';
+
+const formatPct = (v) =>
+    v != null ? `${Number(v).toFixed(1)}%` : '—';
+
 const typeLabel = {
     studio: '🏨 Studio', apartment: '🏠 Apartment', duplex: '🏡 Duplex',
     penthouse: '🌆 Penthouse', townhouse: '🏘️ Townhouse', villa: '🏰 Villa'
@@ -471,7 +477,7 @@ export default function UnitComparison() {
                                             <div style={{ marginTop: 8, display: 'flex', gap: 12, fontSize: '0.78rem' }}>
                                                 <span style={{ color: '#10b981', fontWeight: 700 }}>Score: {winner.score.toFixed(0)}%</span>
                                                 <span style={{ color: 'var(--color-text-muted)' }}>{formatCurrency(winner.unit.price)}</span>
-                                                {winner.unit.area && <span style={{ color: 'var(--color-text-muted)' }}>{winner.unit.area} sqm</span>}
+                                                {winner.unit.area && <span style={{ color: 'var(--color-text-muted)' }}>{formatNum(winner.unit.area)} sqm</span>}
                                             </div>
                                         </div>
 
@@ -544,9 +550,9 @@ export default function UnitComparison() {
                             <CompareRowText label="Location" values={selected.map(u => u.compound?.location)} />
                             <CompareRowText label="Type" values={selected.map(u => typeLabel[u.type] || u.type)} />
                             <CompareRowText label="Finishing" values={selected.map(u => finishingLabel[u.finishingType] || u.finishingType)} />
-                            <CompareRow label="Bedrooms" values={selected.map(u => u.bedrooms)} higherIsBetter={true} />
-                            <CompareRow label="Bathrooms" values={selected.map(u => u.bathrooms)} higherIsBetter={true} />
-                            <CompareRow label="Area (sqm)" values={selected.map(u => u.area)} higherIsBetter={true} format={v => `${v} sqm`} />
+                            <CompareRow label="Bedrooms" values={selected.map(u => u.bedrooms)} higherIsBetter={true} format={formatNum} />
+                            <CompareRow label="Bathrooms" values={selected.map(u => u.bathrooms)} higherIsBetter={true} format={formatNum} />
+                            <CompareRow label="Area (sqm)" values={selected.map(u => u.area)} higherIsBetter={true} format={v => `${formatNum(v)} sqm`} />
                             <CompareRowText label="Floor" values={selected.map(u => u.floor != null ? `Floor ${u.floor}` : null)} />
                             <CompareRowText label="View" values={selected.map(u => u.view ? (viewLabel[u.view] || u.view) : null)} />
                             <CompareRowText label="Location Unit" values={selected.map(u => u.locationUnit)} />
@@ -569,11 +575,11 @@ export default function UnitComparison() {
                             <CompareRowText label="Payment Plan" values={selected.map(u => u.paymentPlan)} />
 
                             <SectionRow label="Market & Investment" colSpan={selected.length} />
-                            <CompareRow label="Appreciation (%/yr)" values={selected.map(u => u.appreciationRate)} higherIsBetter={true} format={v => `${v}%`} />
-                            <CompareRow label="Rent Yield (%/yr)" values={selected.map(u => u.rentYield)} higherIsBetter={true} format={v => `${v}%`} />
-                            <CompareRow label="Price Increase (%/yr)" values={selected.map(u => u.priceIncreaseRate)} higherIsBetter={true} format={v => `${v}%`} />
+                            <CompareRow label="Appreciation (%/yr)" values={selected.map(u => u.appreciationRate)} higherIsBetter={true} format={formatPct} />
+                            <CompareRow label="Rent Yield (%/yr)" values={selected.map(u => u.rentYield)} higherIsBetter={true} format={formatPct} />
+                            <CompareRow label="Price Increase (%/yr)" values={selected.map(u => u.priceIncreaseRate)} higherIsBetter={true} format={formatPct} />
                             <CompareRow label="Rate via Market (EGP/sqm)" values={selected.map(u => u.rateViaMarket)} higherIsBetter={false} format={formatCurrency} />
-                            <CompareRow label="Value for Money (1-10)" values={selected.map(u => u.valueForMoney)} higherIsBetter={true} format={v => `${v}/10`} />
+                            <CompareRow label="Value for Money (1-10)" values={selected.map(u => u.valueForMoney)} higherIsBetter={true} format={v => `${formatNum(v)}/10`} />
                             <CompareRowText label="Resale Market" values={selected.map(u => u.resaleMarket)} />
 
                             <SectionRow label="ROI Analysis" colSpan={selected.length} />
@@ -786,7 +792,7 @@ export default function UnitComparison() {
                                     <div style={{ display: 'flex', gap: 12, fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginBottom: 8 }}>
                                         <span>🛏 {u.bedrooms}</span>
                                         <span>🚿 {u.bathrooms}</span>
-                                        <span>📐 {u.area} sqm</span>
+                                        <span>📐 {formatNum(u.area)} sqm</span>
                                         {u.floor != null && <span>🏢 Fl.{u.floor}</span>}
                                     </div>
 
